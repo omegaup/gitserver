@@ -1,0 +1,20 @@
+language: go
+
+go:
+  - "1.11"
+
+branches:
+  only:
+    - master
+
+install:
+  - go get golang.org/x/lint/golint
+  - go get -d github.com/lhchavez/git2go
+  - (cd ${GOPATH}/src/github.com/lhchavez/git2go/ && ./script/build-libgit2-static.sh)
+  - go get -tags=static -t ./...
+
+script:
+  - ${GOPATH}/bin/golint ./...
+  - go vet -tags=static -v ./...
+  - go test -tags=static -v ./...
+  - if [[ $(git ls-tree -r HEAD^{tree} . --full-name --name-only | grep '\.go$' | xargs -n 1 gofmt -d | wc -c) -ne 0 ]]; then echo "please run gofmt on all the files"; false; fi
