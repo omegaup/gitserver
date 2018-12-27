@@ -136,6 +136,12 @@ var (
 			},
 		},
 	}
+
+	// statementExampleBoundaryRegexp is the regular expression that finds all
+	// example boundary tokens.
+	statementExampleBoundaryRegexp = regexp.MustCompile(
+		`(?:\n|^)\s*\|\|(input|output|description|end)\s*(?:\n|$)`,
+	)
 )
 
 // LedgerIteration is an entry in the iteration ledger.
@@ -282,6 +288,204 @@ func isSlow(
 	}
 
 	return maxRuntime >= slowQueueThresholdDuration, nil
+}
+
+func extractExampleCasesFromStatement(
+	statementContents string,
+) map[string]*common.LiteralCaseSettings {
+	examples := make(map[string]*common.LiteralCaseSettings)
+	lastLabel := ""
+	lastIndex := 0
+
+	var labelMapping []struct {
+		label, chunk string
+	}
+	for _, boundaryIndices := range statementExampleBoundaryRegexp.FindAllStringSubmatchIndex(
+		statementContents,
+		-1,
+	) {
+		currentLabel := statementContents[boundaryIndices[2]:boundaryIndices[3]]
+		lastChunk := statementContents[lastIndex:boundaryIndices[0]]
+
+		if lastLabel != "" {
+			labelMapping = append(
+				labelMapping,
+				struct {
+					label, chunk string
+				}{
+					label: lastLabel,
+					chunk: lastChunk,
+				},
+			)
+		}
+
+		lastLabel = currentLabel
+		lastIndex = boundaryIndices[1]
+	}
+
+	for i := 0; i < len(labelMapping)-1; i++ {
+		if labelMapping[i].label != "input" || labelMapping[i+1].label != "output" {
+			continue
+		}
+		examples[fmt.Sprintf("statement_%03d", len(examples)+1)] = &common.LiteralCaseSettings{
+			Input:          labelMapping[i].chunk,
+			ExpectedOutput: labelMapping[i+1].chunk,
+			Weight:         big.NewRat(1, 1),
+		}
+	}
+
+	return examples
+}
+
+func extractExampleCases(
+	repository *git.Repository,
+	tree *git.Tree,
+) (map[string]*common.LiteralCaseSettings, error) {
+	exampleCases := make(map[string]*common.LiteralCaseSettings)
+
+	for _, examplesDirectory := range []string{"examples", "interactive/examples"} {
+		entry, err := tree.EntryByPath(examplesDirectory)
+		if err != nil {
+			if git.IsErrorCode(err, git.ErrNotFound) {
+				continue
+			}
+			return nil, base.ErrorWithCategory(
+				ErrInternalGit,
+				errors.Wrapf(
+					err,
+					"failed to find the %s directory",
+					examplesDirectory,
+				),
+			)
+		}
+
+		examplesTree, err := repository.LookupTree(entry.Id)
+		if err != nil {
+			return nil, base.ErrorWithCategory(
+				ErrInternalGit,
+				errors.Wrapf(
+					err,
+					"failed to lookup the %s directory",
+					examplesDirectory,
+				),
+			)
+		}
+		defer examplesTree.Free()
+
+		for i := uint64(0); i < examplesTree.EntryCount(); i++ {
+			inputEntry := examplesTree.EntryByIndex(i)
+			if !strings.HasSuffix(inputEntry.Name, ".in") {
+				continue
+			}
+			inputName := inputEntry.Name[:len(inputEntry.Name)-3]
+			outputEntry := examplesTree.EntryByName(
+				fmt.Sprintf("%s.out", inputName),
+			)
+			if outputEntry == nil {
+				return nil, base.ErrorWithCategory(
+					ErrMismatchedInputFile,
+					errors.Errorf(
+						"failed to find the output file for %s/%s",
+						examplesDirectory,
+						inputEntry.Name,
+					),
+				)
+			}
+
+			inputBlob, err := repository.LookupBlob(inputEntry.Id)
+			if err != nil {
+				return nil, base.ErrorWithCategory(
+					ErrInternalGit,
+					errors.Wrapf(
+						err,
+						"failed to lookup input file %s/%s",
+						examplesDirectory,
+						inputEntry.Name,
+					),
+				)
+			}
+			defer inputBlob.Free()
+
+			outputBlob, err := repository.LookupBlob(outputEntry.Id)
+			if err != nil {
+				return nil, base.ErrorWithCategory(
+					ErrInternalGit,
+					errors.Wrapf(
+						err,
+						"failed to lookup output file %s/%s",
+						examplesDirectory,
+						inputEntry.Name,
+					),
+				)
+			}
+			defer outputBlob.Free()
+
+			exampleCases[inputName] = &common.LiteralCaseSettings{
+				Input:          string(inputBlob.Contents()),
+				ExpectedOutput: string(outputBlob.Contents()),
+				Weight:         big.NewRat(1, 1),
+			}
+		}
+	}
+
+	if len(exampleCases) == 0 {
+		// If the problem author did not explicitly specify some sample cases,
+		// let's try to extract them from the statements.
+		entry, err := tree.EntryByPath("statements")
+		if err != nil {
+			return nil, base.ErrorWithCategory(
+				ErrInternalGit,
+				errors.Wrap(
+					err,
+					"failed to find the statements directory",
+				),
+			)
+		}
+
+		statementsTree, err := repository.LookupTree(entry.Id)
+		if err != nil {
+			return nil, base.ErrorWithCategory(
+				ErrInternalGit,
+				errors.Wrap(
+					err,
+					"failed to lookup the statements directory",
+				),
+			)
+		}
+		defer statementsTree.Free()
+
+		for _, statementLanguage := range []string{"es", "en", "pt"} {
+			statementEntry := statementsTree.EntryByName(
+				fmt.Sprintf("%s.markdown", statementLanguage),
+			)
+			if statementEntry == nil {
+				continue
+			}
+
+			statementBlob, err := repository.LookupBlob(statementEntry.Id)
+			if err != nil {
+				if git.IsErrorCode(err, git.ErrNotFound) {
+					continue
+				}
+				return nil, base.ErrorWithCategory(
+					ErrInternalGit,
+					errors.Wrapf(
+						err,
+						"failed to lookup statements/%s.markdown",
+						statementLanguage,
+					),
+				)
+			}
+			defer statementBlob.Free()
+
+			exampleCases = extractExampleCasesFromStatement(string(statementBlob.Contents()))
+			if len(exampleCases) > 0 {
+				break
+			}
+		}
+	}
+
+	return exampleCases, nil
 }
 
 func validateUpdateMaster(
@@ -579,89 +783,9 @@ func validateUpdateMaster(
 			Tolerance: problemSettings.Validator.Tolerance,
 		},
 	}
-	for _, examplesDirectory := range []string{"examples", "interactive/examples"} {
-		entry, err := tree.EntryByPath(examplesDirectory)
-		if err != nil {
-			if git.IsErrorCode(err, git.ErrNotFound) {
-				continue
-			}
-			return base.ErrorWithCategory(
-				ErrInternalGit,
-				errors.Wrapf(
-					err,
-					"failed to find the %s directory",
-					examplesDirectory,
-				),
-			)
-		}
-
-		examplesTree, err := repository.LookupTree(entry.Id)
-		if err != nil {
-			return base.ErrorWithCategory(
-				ErrInternalGit,
-				errors.Wrapf(
-					err,
-					"failed to lookup the %s directory",
-					examplesDirectory,
-				),
-			)
-		}
-		defer examplesTree.Free()
-
-		for i := uint64(0); i < examplesTree.EntryCount(); i++ {
-			inputEntry := examplesTree.EntryByIndex(i)
-			if !strings.HasSuffix(inputEntry.Name, ".in") {
-				continue
-			}
-			inputName := inputEntry.Name[:len(inputEntry.Name)-3]
-			outputEntry := examplesTree.EntryByName(
-				fmt.Sprintf("%s.out", inputName),
-			)
-			if outputEntry == nil {
-				return base.ErrorWithCategory(
-					ErrMismatchedInputFile,
-					errors.Errorf(
-						"failed to find the output file for %s/%s",
-						examplesDirectory,
-						inputEntry.Name,
-					),
-				)
-			}
-
-			inputBlob, err := repository.LookupBlob(inputEntry.Id)
-			if err != nil {
-				return base.ErrorWithCategory(
-					ErrInternalGit,
-					errors.Wrapf(
-						err,
-						"failed to lookup input file %s/%s",
-						examplesDirectory,
-						inputEntry.Name,
-					),
-				)
-			}
-			defer inputBlob.Free()
-
-			outputBlob, err := repository.LookupBlob(outputEntry.Id)
-			if err != nil {
-				return base.ErrorWithCategory(
-					ErrInternalGit,
-					errors.Wrapf(
-						err,
-						"failed to lookup output file %s/%s",
-						examplesDirectory,
-						inputEntry.Name,
-					),
-				)
-			}
-			defer outputBlob.Free()
-
-			problemDistribSettings.Cases[inputName] = &common.LiteralCaseSettings{
-				Input:          string(inputBlob.Contents()),
-				ExpectedOutput: string(outputBlob.Contents()),
-				Weight:         big.NewRat(1, 1),
-			}
-		}
+	if problemDistribSettings.Cases, err = extractExampleCases(repository, tree); err != nil {
+		// extractExampleCases already wrapped the error correctly.
+		return err
 	}
 	if problemSettings.Validator.Name == "custom" {
 		problemDistribSettings.Validator.CustomValidator = &common.LiteralCustomValidatorSettings{

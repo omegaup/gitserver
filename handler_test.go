@@ -15,11 +15,13 @@ import (
 	"github.com/omegaup/quark/common"
 	"io"
 	"io/ioutil"
+	"math/big"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
 	"os"
 	"path"
+	"reflect"
 	"strings"
 	"testing"
 	"time"
@@ -1701,10 +1703,21 @@ func TestInteractive(t *testing.T) {
 			problemAlias,
 			&git.Oid{},
 			map[string]io.Reader{
-				"settings.json":          strings.NewReader(gitservertest.DefaultSettingsJSON),
-				"cases/0.in":             strings.NewReader("1 2"),
-				"cases/0.out":            strings.NewReader("3"),
-				"statements/es.markdown": strings.NewReader("Sumas"),
+				"settings.json": strings.NewReader(gitservertest.DefaultSettingsJSON),
+				"cases/0.in":    strings.NewReader("1 2"),
+				"cases/0.out":   strings.NewReader("3"),
+				"statements/es.markdown": strings.NewReader(`Sumas
+
+# Examples
+
+||input
+Example 1
+||output
+Example 1
+||description
+This example won't be copied since there are explicit example files.
+||end
+`),
 				"interactive/sums.idl": strings.NewReader(`// sums.idl
 interface Main {
 };
@@ -1789,5 +1802,343 @@ int main(int argc, char* argv[]) {
 	}
 	if problemDistribSettings.Interactive == nil {
 		t.Fatalf("Failed to produce interactive settings")
+	}
+	expectedExampleCases := map[string]*common.LiteralCaseSettings{
+		"sample": {
+			Input:          "0 1",
+			ExpectedOutput: "1",
+			Weight:         big.NewRat(1, 1),
+		},
+	}
+	if !reflect.DeepEqual(expectedExampleCases, problemDistribSettings.Cases) {
+		t.Errorf(
+			"Mismatched example cases. expected %q, got %q",
+			expectedExampleCases,
+			problemDistribSettings.Cases,
+		)
+	}
+}
+
+func TestExampleCases(t *testing.T) {
+	tmpDir, err := ioutil.TempDir("", "handler_test")
+	if err != nil {
+		t.Fatalf("Failed to create directory: %v", err)
+	}
+	if os.Getenv("PRESERVE") == "" {
+		defer os.RemoveAll(tmpDir)
+	}
+
+	log := base.StderrLog()
+	ts := httptest.NewServer(GitHandler(
+		tmpDir,
+		NewGitProtocol(authorize, nil, true, OverallWallTimeHardLimit, fakeInteractiveSettingsCompiler, log),
+		log,
+	))
+	defer ts.Close()
+
+	problemAlias := "sumas"
+
+	repo, err := InitRepository(path.Join(tmpDir, problemAlias+".git"))
+	if err != nil {
+		t.Fatalf("Failed to initialize git repository: %v", err)
+	}
+	defer repo.Free()
+
+	parentOid := &git.Oid{}
+	{
+		newOid, packContents := createCommit(
+			t,
+			tmpDir,
+			problemAlias,
+			parentOid,
+			map[string]io.Reader{
+				"settings.json":          strings.NewReader(gitservertest.DefaultSettingsJSON),
+				"cases/0.in":             strings.NewReader("1 2"),
+				"cases/0.out":            strings.NewReader("3"),
+				"statements/es.markdown": strings.NewReader("Sumas"),
+			},
+			"Initial commit",
+			log,
+		)
+		push(
+			t,
+			tmpDir,
+			adminAuthorization,
+			problemAlias,
+			"refs/heads/master",
+			parentOid, newOid,
+			packContents,
+			[]githttp.PktLineResponse{
+				{Line: "unpack ok\n", Err: nil},
+				{Line: "ok refs/heads/master\n", Err: nil},
+			},
+			ts,
+		)
+
+		masterCommit, err := repo.LookupCommit(
+			getReference(t, problemAlias, "refs/heads/master", ts),
+		)
+		if err != nil {
+			t.Fatalf("Failed to lookup commit: %v", err)
+		}
+		defer masterCommit.Free()
+
+		parentOid = masterCommit.Id()
+
+		masterTree, err := masterCommit.Tree()
+		if err != nil {
+			t.Fatalf("Failed to lookup tree: %v", err)
+		}
+		defer masterTree.Free()
+
+		problemDistribSettings, err := getProblemDistribSettings(
+			repo,
+			masterTree,
+		)
+		if err != nil {
+			t.Fatalf("failed to get problem distributable settings: %v", err)
+		}
+		expectedExampleCases := map[string]*common.LiteralCaseSettings{}
+		if !reflect.DeepEqual(expectedExampleCases, problemDistribSettings.Cases) {
+			t.Errorf(
+				"Mismatched example cases. expected %q, got %q",
+				expectedExampleCases,
+				problemDistribSettings.Cases,
+			)
+		}
+	}
+	{
+		newOid, packContents := createCommit(
+			t,
+			tmpDir,
+			problemAlias,
+			parentOid,
+			map[string]io.Reader{
+				"settings.json": strings.NewReader(gitservertest.DefaultSettingsJSON),
+				"cases/0.in":    strings.NewReader("1 2"),
+				"cases/0.out":   strings.NewReader("3"),
+				"statements/es.markdown": strings.NewReader(`Sumas
+
+# Examples
+
+||input
+1 2
+||output
+3
+||input
+2 3
+||output
+5
+||end
+`),
+			},
+			"Initial commit",
+			log,
+		)
+		push(
+			t,
+			tmpDir,
+			adminAuthorization,
+			problemAlias,
+			"refs/heads/master",
+			parentOid, newOid,
+			packContents,
+			[]githttp.PktLineResponse{
+				{Line: "unpack ok\n", Err: nil},
+				{Line: "ok refs/heads/master\n", Err: nil},
+			},
+			ts,
+		)
+
+		masterCommit, err := repo.LookupCommit(
+			getReference(t, problemAlias, "refs/heads/master", ts),
+		)
+		if err != nil {
+			t.Fatalf("Failed to lookup commit: %v", err)
+		}
+		defer masterCommit.Free()
+
+		parentOid = masterCommit.Id()
+
+		masterTree, err := masterCommit.Tree()
+		if err != nil {
+			t.Fatalf("Failed to lookup tree: %v", err)
+		}
+		defer masterTree.Free()
+
+		problemDistribSettings, err := getProblemDistribSettings(
+			repo,
+			masterTree,
+		)
+		if err != nil {
+			t.Fatalf("failed to get problem distributable settings: %v", err)
+		}
+		expectedExampleCases := map[string]*common.LiteralCaseSettings{
+			"statement_001": {
+				Input:          "1 2",
+				ExpectedOutput: "3",
+				Weight:         big.NewRat(1, 1),
+			},
+			"statement_002": {
+				Input:          "2 3",
+				ExpectedOutput: "5",
+				Weight:         big.NewRat(1, 1),
+			},
+		}
+		if !reflect.DeepEqual(expectedExampleCases, problemDistribSettings.Cases) {
+			t.Errorf(
+				"Mismatched example cases. expected %q, got %q",
+				expectedExampleCases,
+				problemDistribSettings.Cases,
+			)
+		}
+	}
+	{
+		newOid, packContents := createCommit(
+			t,
+			tmpDir,
+			problemAlias,
+			parentOid,
+			map[string]io.Reader{
+				"settings.json":       strings.NewReader(gitservertest.DefaultSettingsJSON),
+				"examples/sample.in":  strings.NewReader("1 2"),
+				"examples/sample.out": strings.NewReader("3"),
+				"cases/0.in":          strings.NewReader("1 2"),
+				"cases/0.out":         strings.NewReader("3"),
+				"statements/es.markdown": strings.NewReader(`Sumas
+
+# Examples
+
+||input
+1 2
+||output
+3
+||input
+2 3
+||output
+5
+||end
+`),
+			},
+			"Initial commit",
+			log,
+		)
+		push(
+			t,
+			tmpDir,
+			adminAuthorization,
+			problemAlias,
+			"refs/heads/master",
+			parentOid, newOid,
+			packContents,
+			[]githttp.PktLineResponse{
+				{Line: "unpack ok\n", Err: nil},
+				{Line: "ok refs/heads/master\n", Err: nil},
+			},
+			ts,
+		)
+
+		masterCommit, err := repo.LookupCommit(
+			getReference(t, problemAlias, "refs/heads/master", ts),
+		)
+		if err != nil {
+			t.Fatalf("Failed to lookup commit: %v", err)
+		}
+		defer masterCommit.Free()
+
+		parentOid = masterCommit.Id()
+
+		masterTree, err := masterCommit.Tree()
+		if err != nil {
+			t.Fatalf("Failed to lookup tree: %v", err)
+		}
+		defer masterTree.Free()
+
+		problemDistribSettings, err := getProblemDistribSettings(
+			repo,
+			masterTree,
+		)
+		if err != nil {
+			t.Fatalf("failed to get problem distributable settings: %v", err)
+		}
+		expectedExampleCases := map[string]*common.LiteralCaseSettings{
+			"sample": {
+				Input:          "1 2",
+				ExpectedOutput: "3",
+				Weight:         big.NewRat(1, 1),
+			},
+		}
+		if !reflect.DeepEqual(expectedExampleCases, problemDistribSettings.Cases) {
+			t.Errorf(
+				"Mismatched example cases. expected %q, got %q",
+				expectedExampleCases,
+				problemDistribSettings.Cases,
+			)
+		}
+	}
+}
+
+func TestExtractExampleCasesFromStatement(t *testing.T) {
+	for _, testCase := range []struct {
+		statement      string
+		expectedOutput map[string]*common.LiteralCaseSettings
+	}{
+		{
+			statement: `Sumas
+||input
+First input
+||output
+First output
+||description
+yeah...
+||input
+Second input
+||output
+Second output
+||end`,
+			expectedOutput: map[string]*common.LiteralCaseSettings{
+				"statement_001": {
+					Input:          "First input",
+					ExpectedOutput: "First output",
+					Weight:         big.NewRat(1, 1),
+				},
+				"statement_002": {
+					Input:          "Second input",
+					ExpectedOutput: "Second output",
+					Weight:         big.NewRat(1, 1),
+				},
+			},
+		},
+		{
+			statement: `Sumas
+||input
+Foo
+||description
+why is this missing an output?
+||input
+Foo
+||input
+Another missing output.
+||end`,
+			expectedOutput: map[string]*common.LiteralCaseSettings{},
+		},
+		{
+			statement: `Sumas
+||input
+Foo
+||output
+missing the end thingy`,
+			expectedOutput: map[string]*common.LiteralCaseSettings{},
+		},
+	} {
+		actualOutput := extractExampleCasesFromStatement(testCase.statement)
+		if !reflect.DeepEqual(testCase.expectedOutput, actualOutput) {
+			t.Errorf(
+				"Failed to extract examples from %v. expected %q, got %q",
+				testCase.statement,
+				testCase.expectedOutput,
+				actualOutput,
+			)
+		}
 	}
 }
