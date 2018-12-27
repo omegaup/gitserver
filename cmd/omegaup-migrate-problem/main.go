@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"database/sql"
 	"flag"
@@ -261,7 +262,7 @@ func convertCommitToPackfile(
 		defer f.Close()
 
 		if _, err := f.Write(originalBlob.Contents()); err != nil {
-			walkErr = errors.Wrapf(err, "failed to write zip entry %s", objectPath)
+			walkErr = errors.Wrapf(err, "failed to write entry %s", objectPath)
 			return -1
 		}
 		return 0
@@ -280,7 +281,35 @@ func convertCommitToPackfile(
 		}
 		defer f.Close()
 
+		if strings.HasPrefix(objectPath, "examples/") && strings.HasSuffix(objectPath, ".in") {
+			exampleContents, err := ioutil.ReadAll(f)
+			if err != nil {
+				return nil, errors.Wrapf(err, "failed to read %s", objectPath)
+			}
+			if _, err := f.Seek(0, 0); err != nil {
+				return nil, errors.Wrapf(err, "failed to rewind stream for %s", objectPath)
+			}
+
+			outFilename := strings.TrimSuffix(objectPath, ".in") + ".out"
+			if _, ok := contents[outFilename]; !ok && bytes.Contains(exampleContents, []byte("<ejecucion>")) {
+				log.Info("generated an artificial .out for the example", "filename", objectPath)
+				contents[outFilename] = bytes.NewReader([]byte{})
+			}
+		}
+
 		contents[objectPath] = f
+	}
+
+	// Handle mismatched examples.
+	for filename := range contents {
+		if !strings.HasPrefix(filename, "examples/") || !strings.HasSuffix(filename, ".in") {
+			continue
+		}
+		outFilename := strings.TrimSuffix(filename, ".in") + ".out"
+		if _, ok := contents[outFilename]; !ok {
+			log.Info("dropping example due to it being mismatched", "filename", filename)
+			delete(contents, filename)
+		}
 	}
 
 	return gitserver.CreatePackfile(
