@@ -80,6 +80,10 @@ Thumbs.db
 *.swp
 *.orig
 
+# Packaged files
+*.zip
+*.bz2
+
 # Karel
 *.kx
 
@@ -96,6 +100,7 @@ Thumbs.db
 *.lo
 *.o
 *.obj
+*.hi
 
 # Precompiled Headers
 *.gch

@@ -312,6 +312,27 @@ func convertCommitToPackfile(
 		}
 	}
 
+	// Drop some problematic files.
+	for filename := range contents {
+		for _, extension := range []string{
+			".DS_Store",
+			".bz2",
+			".hi",
+			".html",
+			".js",
+			".o",
+			".swp",
+			".zip",
+			"~",
+		} {
+			if strings.HasSuffix(filename, extension) {
+				log.Info("dropping problematic file", "filename", filename)
+				delete(contents, filename)
+				break
+			}
+		}
+	}
+
 	return gitserver.CreatePackfile(
 		contents,
 		settings,
