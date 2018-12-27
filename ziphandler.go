@@ -220,6 +220,9 @@ func parseTestplan(testplan io.Reader, groupSettings map[string]map[string]*big.
 	return nil
 }
 
+// CreatePackfile creates a packfile that contains a commit that contains the
+// specified contents plus a subset of the parent commit's tree, depending of
+// the value of updateMask.
 func CreatePackfile(
 	contents map[string]io.Reader,
 	settings *common.ProblemSettings,
