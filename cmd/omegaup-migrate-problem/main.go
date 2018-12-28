@@ -333,6 +333,23 @@ func convertCommitToPackfile(
 		}
 	}
 
+	// Handle mismatch between problems having validators and claiming to need
+	// validators.
+	hasValidator := false
+	for filename := range contents {
+		if strings.HasPrefix(filename, "validator.") {
+			hasValidator = true
+			if settings.Validator.Name != "custom" {
+				log.Info("deleting unused validator", "filename", filename, "commit", commitID.String())
+				delete(contents, filename)
+			}
+		}
+	}
+	if settings.Validator.Name == "custom" && !hasValidator {
+		log.Info("settings validator to 'token-caseless' for a single commit", "commit", commitID.String())
+		settings.Validator.Name = "token-caseless"
+	}
+
 	return gitserver.CreatePackfile(
 		contents,
 		settings,
