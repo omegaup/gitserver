@@ -10,6 +10,7 @@ import (
 	"io"
 	"io/ioutil"
 	"os"
+	"reflect"
 	"strings"
 	"testing"
 )
@@ -57,7 +58,7 @@ func getTreeOid(t *testing.T, extraFileContents map[string]io.Reader, log log15.
 	}
 	defer lockfile.Unlock()
 
-	if _, err = commitZipFile(
+	if _, err := commitZipFile(
 		tmpfile.Name(),
 		repo,
 		lockfile,
@@ -240,7 +241,7 @@ func TestProblemUpdateZip(t *testing.T) {
 		if _, err = tmpfile.Write(zipContents); err != nil {
 			t.Fatalf("Failed to write zip: %v", err)
 		}
-		if _, err = commitZipFile(
+		updateResult, err := commitZipFile(
 			tmpfile.Name(),
 			repo,
 			lockfile,
@@ -250,7 +251,8 @@ func TestProblemUpdateZip(t *testing.T) {
 			gitserver.ConvertZipUpdateAll,
 			true,
 			log,
-		); err != nil {
+		)
+		if err != nil {
 			t.Fatalf("Failed to commit zip: %v", err)
 		}
 		if err := lockfile.Unlock(); err != nil {
@@ -258,6 +260,23 @@ func TestProblemUpdateZip(t *testing.T) {
 		}
 		if err := lockfile.RLock(); err != nil {
 			t.Fatalf("Failed to acquire the lockfile: %v", err)
+		}
+
+		expectedUpdatedFiles := []UpdatedFile{
+			{".gitattributes", "added"},
+			{".gitignore", "added"},
+			{"cases/0.in", "added"},
+			{"cases/0.out", "added"},
+			{"settings.distrib.json", "added"},
+			{"settings.json", "added"},
+			{"statements/es.markdown", "added"},
+		}
+		if !reflect.DeepEqual(expectedUpdatedFiles, updateResult.UpdatedFiles) {
+			t.Errorf(
+				"updated files. expected %v, got %v",
+				expectedUpdatedFiles,
+				updateResult.UpdatedFiles,
+			)
 		}
 
 		oldReferences = discoverReferences(t, repo)
@@ -281,7 +300,7 @@ func TestProblemUpdateZip(t *testing.T) {
 		if _, err = tmpfile.Write(zipContents); err != nil {
 			t.Fatalf("Failed to write zip: %v", err)
 		}
-		if _, err = commitZipFile(
+		updateResult, err := commitZipFile(
 			tmpfile.Name(),
 			repo,
 			lockfile,
@@ -291,7 +310,8 @@ func TestProblemUpdateZip(t *testing.T) {
 			gitserver.ConvertZipUpdateAll,
 			true,
 			log,
-		); err != nil {
+		)
+		if err != nil {
 			t.Fatalf("Failed to commit zip: %v", err)
 		}
 		if err := lockfile.Unlock(); err != nil {
@@ -299,6 +319,17 @@ func TestProblemUpdateZip(t *testing.T) {
 		}
 		if err := lockfile.RLock(); err != nil {
 			t.Fatalf("Failed to acquire the lockfile: %v", err)
+		}
+
+		expectedUpdatedFiles := []UpdatedFile{
+			{"statements/es.markdown", "modified"},
+		}
+		if !reflect.DeepEqual(expectedUpdatedFiles, updateResult.UpdatedFiles) {
+			t.Errorf(
+				"updated files. expected %v, got %v",
+				expectedUpdatedFiles,
+				updateResult.UpdatedFiles,
+			)
 		}
 
 		newReferences = discoverReferences(t, repo)
@@ -355,7 +386,7 @@ func TestProblemUpdateBlobs(t *testing.T) {
 		if _, err = tmpfile.Write(zipContents); err != nil {
 			t.Fatalf("Failed to write zip: %v", err)
 		}
-		if _, err = commitZipFile(
+		updateResult, err := commitZipFile(
 			tmpfile.Name(),
 			repo,
 			lockfile,
@@ -365,7 +396,8 @@ func TestProblemUpdateBlobs(t *testing.T) {
 			gitserver.ConvertZipUpdateAll,
 			true,
 			log,
-		); err != nil {
+		)
+		if err != nil {
 			t.Fatalf("Failed to commit zip: %v", err)
 		}
 		if err := lockfile.Unlock(); err != nil {
@@ -373,6 +405,23 @@ func TestProblemUpdateBlobs(t *testing.T) {
 		}
 		if err := lockfile.RLock(); err != nil {
 			t.Fatalf("Failed to acquire the lockfile: %v", err)
+		}
+
+		expectedUpdatedFiles := []UpdatedFile{
+			{".gitattributes", "added"},
+			{".gitignore", "added"},
+			{"cases/0.in", "added"},
+			{"cases/0.out", "added"},
+			{"settings.distrib.json", "added"},
+			{"settings.json", "added"},
+			{"statements/es.markdown", "added"},
+		}
+		if !reflect.DeepEqual(expectedUpdatedFiles, updateResult.UpdatedFiles) {
+			t.Errorf(
+				"updated files. expected %v, got %v",
+				expectedUpdatedFiles,
+				updateResult.UpdatedFiles,
+			)
 		}
 
 		oldReferences = discoverReferences(t, repo)

@@ -20,6 +20,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"sort"
 	"time"
 )
 
@@ -40,17 +41,186 @@ var (
 	blobUpdateJSON = flag.String("blob-update", "", "Update a subset of the blobs")
 )
 
+// UpdatedFile represents an updated file. Type is either "added", "deleted",
+// or "modified".
+type UpdatedFile struct {
+	Path string `json:"path"`
+	Type string `json:"type"`
+}
+
+type byPath []UpdatedFile
+
+func (p byPath) Len() int           { return len(p) }
+func (p byPath) Swap(i, j int)      { p[i], p[j] = p[j], p[i] }
+func (p byPath) Less(i, j int) bool { return p[i].Path < p[j].Path }
+
 // UpdateResult represents the result of running this command.
 type UpdateResult struct {
-	Status      string               `json:"status"`
-	Error       string               `json:"error,omitempty"`
-	UpdatedRefs []githttp.UpdatedRef `json:"updated_refs,omitempty"`
+	Status       string               `json:"status"`
+	Error        string               `json:"error,omitempty"`
+	UpdatedRefs  []githttp.UpdatedRef `json:"updated_refs,omitempty"`
+	UpdatedFiles []UpdatedFile        `json:"updated_files"`
 }
 
 // BlobUpdate represents updating a single blob in the repository.
 type BlobUpdate struct {
 	Path         string `json:"path"`
 	ContentsPath string `json:"contents_path"`
+}
+
+func getAllFilesForCommit(
+	repo *git.Repository,
+	commitID *git.Oid,
+) (map[string]*git.Oid, error) {
+	if commitID.IsZero() {
+		return map[string]*git.Oid{}, nil
+	}
+
+	commit, err := repo.LookupCommit(commitID)
+	if err != nil {
+		return nil, base.ErrorWithCategory(
+			gitserver.ErrInternalGit,
+			errors.Wrapf(
+				err,
+				"failed to lookup commit %s",
+				commitID.String(),
+			),
+		)
+	}
+	defer commit.Free()
+
+	tree, err := commit.Tree()
+	if err != nil {
+		return nil, base.ErrorWithCategory(
+			gitserver.ErrInternalGit,
+			errors.Wrapf(
+				err,
+				"failed to lookup commit %s",
+				commitID.String(),
+			),
+		)
+	}
+	defer tree.Free()
+
+	commitFiles := make(map[string]*git.Oid)
+	if err := tree.Walk(func(name string, entry *git.TreeEntry) int {
+		if entry.Type != git.ObjectBlob {
+			return 0
+		}
+		filename := path.Join(name, entry.Name)
+		commitFiles[filename] = entry.Id
+		return 0
+	}); err != nil {
+		return nil, base.ErrorWithCategory(
+			gitserver.ErrInternalGit,
+			errors.Wrapf(
+				err,
+				"failed to traverse tree for commit %s",
+				commitID.String(),
+			),
+		)
+	}
+
+	return commitFiles, nil
+}
+
+func getUpdatedFiles(
+	repo *git.Repository,
+	updatedRefs []githttp.UpdatedRef,
+) ([]UpdatedFile, error) {
+	var masterUpdatedRef *githttp.UpdatedRef
+	for _, updatedRef := range updatedRefs {
+		if updatedRef.Name != "refs/heads/master" {
+			continue
+		}
+		masterUpdatedRef = &updatedRef
+		break
+	}
+
+	if masterUpdatedRef == nil {
+		return nil, base.ErrorWithCategory(
+			gitserver.ErrInternalGit,
+			errors.New("failed to find the updated master ref"),
+		)
+	}
+
+	fromCommitID, err := git.NewOid(masterUpdatedRef.From)
+	if err != nil {
+		return nil, base.ErrorWithCategory(
+			gitserver.ErrInternalGit,
+			errors.Wrapf(
+				err,
+				"failed to parse the old OID '%s'",
+				masterUpdatedRef.From,
+			),
+		)
+	}
+
+	toCommitID, err := git.NewOid(masterUpdatedRef.To)
+	if err != nil {
+		return nil, base.ErrorWithCategory(
+			gitserver.ErrInternalGit,
+			errors.Wrapf(
+				err,
+				"failed to parse the new OID '%s'",
+				masterUpdatedRef.To,
+			),
+		)
+	}
+
+	fromIDs, err := getAllFilesForCommit(repo, fromCommitID)
+	if err != nil {
+		return nil, base.ErrorWithCategory(
+			gitserver.ErrInternalGit,
+			errors.Wrapf(
+				err,
+				"failed to get the old files for commit %s",
+				fromCommitID.String(),
+			),
+		)
+	}
+	toIDs, err := getAllFilesForCommit(repo, toCommitID)
+	if err != nil {
+		return nil, base.ErrorWithCategory(
+			gitserver.ErrInternalGit,
+			errors.Wrapf(
+				err,
+				"failed to get the new files for commit %s",
+				toCommitID.String(),
+			),
+		)
+	}
+
+	var updatedFiles []UpdatedFile
+	// Deleted files.
+	for filename := range fromIDs {
+		if _, ok := toIDs[filename]; !ok {
+			updatedFiles = append(updatedFiles, UpdatedFile{
+				Path: filename,
+				Type: "deleted",
+			})
+		}
+	}
+
+	// Added / modified files.
+	for filename, toID := range toIDs {
+		if fromID, ok := fromIDs[filename]; ok {
+			if !fromID.Equal(toID) {
+				updatedFiles = append(updatedFiles, UpdatedFile{
+					Path: filename,
+					Type: "modified",
+				})
+			}
+		} else {
+			updatedFiles = append(updatedFiles, UpdatedFile{
+				Path: filename,
+				Type: "added",
+			})
+		}
+	}
+
+	sort.Sort(byPath(updatedFiles))
+	return updatedFiles, nil
 }
 
 func commitZipFile(
@@ -148,9 +318,14 @@ func commitZipFile(
 		return nil, err
 	}
 
+	updatedFiles, err := getUpdatedFiles(repo, updatedRefs)
+	if err != nil {
+		log.Error("failed to get updated files", "err", err)
+	}
 	return &UpdateResult{
-		Status:      "ok",
-		UpdatedRefs: updatedRefs,
+		Status:       "ok",
+		UpdatedRefs:  updatedRefs,
+		UpdatedFiles: updatedFiles,
 	}, nil
 }
 
@@ -381,9 +556,14 @@ func commitBlobs(
 		return nil, err
 	}
 
+	updatedFiles, err := getUpdatedFiles(repo, updatedRefs)
+	if err != nil {
+		log.Error("failed to get updated files", "err", err)
+	}
 	return &UpdateResult{
-		Status:      "ok",
-		UpdatedRefs: updatedRefs,
+		Status:       "ok",
+		UpdatedRefs:  updatedRefs,
+		UpdatedFiles: updatedFiles,
 	}, nil
 }
 
