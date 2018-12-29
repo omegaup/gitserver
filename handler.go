@@ -815,6 +815,7 @@ func validateUpdateMaster(
 	if problemSettings.Interactive != nil {
 		problemDistribSettings.Interactive = &common.LiteralInteractiveSettings{
 			IDLSource:  string(idlFileContents),
+			Templates:  problemSettings.Interactive.Templates,
 			ModuleName: problemSettings.Interactive.ModuleName,
 			ParentLang: problemSettings.Interactive.ParentLang,
 			MainSource: string(mainDistribSourceContents),

@@ -1675,6 +1675,7 @@ func TestInteractive(t *testing.T) {
 			&FakeInteractiveSettingsCompiler{
 				Settings: &common.InteractiveSettings{
 					Interfaces:            map[string]map[string]*common.InteractiveInterface{},
+					Templates:             map[string]string{},
 					Main:                  "",
 					ModuleName:            "",
 					ParentLang:            "",
