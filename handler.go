@@ -652,7 +652,7 @@ func validateUpdateMaster(
 			}
 			defer mainSourceBlob.Free()
 
-			mainDistribSourceContents := mainSourceBlob.Contents()
+			mainDistribSourceContents = mainSourceBlob.Contents()
 			distribPath := fmt.Sprintf("interactive/Main.distrib.%s", parentLang)
 			requestContext.UpdatedFiles[distribPath] = bytes.NewReader(
 				mainDistribSourceContents,

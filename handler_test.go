@@ -1817,6 +1817,9 @@ int main(int argc, char* argv[]) {
 			problemDistribSettings.Cases,
 		)
 	}
+	if "" == problemDistribSettings.Interactive.MainSource {
+		t.Errorf("Missing main source file")
+	}
 }
 
 func TestExampleCases(t *testing.T) {
