@@ -595,8 +595,22 @@ func main() {
 				if err != nil {
 					return errors.Wrapf(err, "failed to access %s", path)
 				}
-				if err := os.Chmod(path, originalStat.Mode()); err != nil {
-					return errors.Wrapf(err, "failed to chmod temporary directory %s", path)
+				if info.IsDir() {
+					if err := os.Chmod(path, originalStat.Mode()); err != nil {
+						return errors.Wrapf(
+							err,
+							"failed to chmod directory in temporary directory %s",
+							path,
+						)
+					}
+				} else {
+					if err := os.Chmod(path, 0644); err != nil {
+						return errors.Wrapf(
+							err,
+							"failed to chmod file in temporary directory %s",
+							path,
+						)
+					}
 				}
 				if err := os.Chown(
 					path,
