@@ -37,9 +37,9 @@ func postZip(
 	create bool,
 	ts *httptest.Server,
 ) {
-	action := "update"
+	action := "git-upload-zip"
 	if create {
-		action = "create"
+		action = "git-upload-zip?create=1"
 	}
 	pushURL, err := url.Parse(ts.URL + "/" + problemAlias + "/" + action)
 	if err != nil {

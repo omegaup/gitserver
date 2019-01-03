@@ -854,7 +854,7 @@ type zipUploadHandler struct {
 }
 
 func (h *zipUploadHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	splitPath := strings.Split(strings.TrimSuffix(r.URL.Path[1:], "/"), "/")
+	splitPath := strings.SplitN(r.URL.Path[1:], "/", 2)
 	if len(splitPath) != 2 {
 		w.WriteHeader(http.StatusNotFound)
 		return
@@ -864,7 +864,7 @@ func (h *zipUploadHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusNotFound)
 		return
 	}
-	if splitPath[1] != "create" && splitPath[1] != "update" {
+	if splitPath[1] != "git-upload-zip" {
 		w.WriteHeader(http.StatusNotFound)
 		return
 	}
@@ -895,7 +895,7 @@ func (h *zipUploadHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	ctx := request.NewContext(r.Context())
 
-	create := splitPath[1] == "create"
+	create := r.URL.Query().Get("create") != ""
 
 	repositoryPath := path.Join(h.rootPath, fmt.Sprintf("%s.git", repositoryName))
 	h.log.Info(

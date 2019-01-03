@@ -14,14 +14,14 @@ import (
 	"net/http/pprof"
 	"os"
 	"os/signal"
+	"strings"
 	"time"
 )
 
 var (
 	rootPath           = flag.String("root", "", "Root path of all repositories")
 	port               = flag.Int("port", 33861, "Port in which the server will listen")
-	zipPort            = flag.Int("zip-port", 33862, "Port in which the zip importer server will listen")
-	pprofPort          = flag.Int("pprof-port", 33863, "Port in which the pprof server will listen")
+	pprofPort          = flag.Int("pprof-port", 33862, "Port in which the pprof server will listen")
 	libinteractivePath = flag.String("libinteractive-path", "/usr/share/java/libinteractive.jar", "Path of libinteractive.jar")
 	log                log15.Logger
 )
@@ -74,6 +74,31 @@ func referenceDiscovery(
 	return referenceName == "refs/heads/public"
 }
 
+type muxGitHandler struct {
+	gitHandler http.Handler
+	zipHandler http.Handler
+}
+
+func muxHandler(
+	rootPath string,
+	protocol *githttp.GitProtocol,
+	log log15.Logger,
+) http.Handler {
+	return &muxGitHandler{
+		gitHandler: gitserver.GitHandler(rootPath, protocol, log),
+		zipHandler: gitserver.ZipHandler(rootPath, protocol, log),
+	}
+}
+
+func (h *muxGitHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	splitPath := strings.SplitN(r.URL.Path[1:], "/", 2)
+	if len(splitPath) == 2 && splitPath[1] == "git-upload-zip" {
+		h.zipHandler.ServeHTTP(w, r)
+	} else {
+		h.gitHandler.ServeHTTP(w, r)
+	}
+}
+
 func main() {
 	flag.Parse()
 	log = base.StderrLog()
@@ -100,7 +125,7 @@ func main() {
 
 	gitServer := &http.Server{
 		Addr:    fmt.Sprintf(":%d", *port),
-		Handler: gitserver.GitHandler(*rootPath, protocol, log),
+		Handler: muxHandler(*rootPath, protocol, log),
 	}
 	go func() {
 		if err := gitServer.ListenAndServe(); err != nil {
@@ -108,17 +133,6 @@ func main() {
 		}
 	}()
 	log.Info(fmt.Sprintf("git server ready for connections at http://localhost:%d", *port))
-
-	zipServer := &http.Server{
-		Addr:    fmt.Sprintf(":%d", *zipPort),
-		Handler: gitserver.ZipHandler(*rootPath, protocol, log),
-	}
-	go func() {
-		if err := zipServer.ListenAndServe(); err != nil {
-			log.Error("zipServer ListenAndServe", "err", err)
-		}
-	}()
-	log.Info(fmt.Sprintf("zip server ready for connections at http://localhost:%d", *zipPort))
 
 	pprofServeMux := http.NewServeMux()
 	pprofServeMux.HandleFunc("/debug/pprof/", pprof.Index)
@@ -143,7 +157,6 @@ func main() {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	gitServer.Shutdown(ctx)
-	zipServer.Shutdown(ctx)
 	pprofServer.Shutdown(ctx)
 
 	log.Info("Server gracefully stopped.")
