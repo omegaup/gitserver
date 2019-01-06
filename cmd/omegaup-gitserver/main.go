@@ -2,14 +2,17 @@ package main
 
 import (
 	"context"
+	"encoding/base64"
 	"flag"
 	"fmt"
 	"github.com/inconshreveable/log15"
 	git "github.com/lhchavez/git2go"
+	"github.com/o1egl/paseto"
 	"github.com/omegaup/githttp"
 	"github.com/omegaup/gitserver"
 	"github.com/omegaup/gitserver/request"
 	base "github.com/omegaup/go-base"
+	"golang.org/x/crypto/ed25519"
 	"net/http"
 	"net/http/pprof"
 	"os"
@@ -19,41 +22,76 @@ import (
 )
 
 var (
-	rootPath           = flag.String("root", "", "Root path of all repositories")
-	port               = flag.Int("port", 33861, "Port in which the server will listen")
-	pprofPort          = flag.Int("pprof-port", 33862, "Port in which the pprof server will listen")
-	libinteractivePath = flag.String("libinteractive-path", "/usr/share/java/libinteractive.jar", "Path of libinteractive.jar")
-	log                log15.Logger
+	rootPath                = flag.String("root", "", "Root path of all repositories")
+	publicKeyBase64         = flag.String("public-key", "gKEg5JlIOA1BsIxETZYhjd+ZGchY/rZeQM0GheAWvXw=", "Public key of the omegaUp frontend")
+	port                    = flag.Int("port", 33861, "Port in which the server will listen")
+	pprofPort               = flag.Int("pprof-port", 33862, "Port in which the pprof server will listen")
+	libinteractivePath      = flag.String("libinteractive-path", "/usr/share/java/libinteractive.jar", "Path of libinteractive.jar")
+	allowDirectPushToMaster = flag.Bool("allow-direct-push-to-master", false, "Allow direct push to master")
+	log                     log15.Logger
 )
 
-func authorize(
+type bearerAuthorization struct {
+	log       log15.Logger
+	publicKey ed25519.PublicKey
+}
+
+func (a *bearerAuthorization) parseBearerAuth(auth string) (username, problem string, ok bool) {
+	const prefix = "Bearer "
+	// Case insensitive prefix match. See Issue 22736.
+	if len(auth) < len(prefix) || !strings.EqualFold(auth[:len(prefix)], prefix) {
+		return
+	}
+
+	var jsonToken paseto.JSONToken
+	var footer string
+	if err := paseto.NewV2().Verify(auth[len(prefix):], a.publicKey, &jsonToken, &footer); err != nil {
+		a.log.Error("failed to verify token", "err", err)
+		return
+	}
+
+	if err := jsonToken.Validate(paseto.IssuedBy("omegaUp frontend"), paseto.ValidAt(time.Now())); err != nil {
+		a.log.Error("failed to validate token", "err", err)
+		return
+	}
+
+	username = jsonToken.Subject
+	problem = jsonToken.Get("problem")
+	ok = true
+	return
+}
+
+func (a *bearerAuthorization) authorize(
 	ctx context.Context,
 	w http.ResponseWriter,
 	r *http.Request,
 	repositoryName string,
 	operation githttp.GitOperation,
 ) (githttp.AuthorizationLevel, string) {
-	username, _, ok := r.BasicAuth()
+	username, problem, ok := a.parseBearerAuth(r.Header.Get("Authorization"))
 	if !ok {
-		w.Header().Set("WWW-Authenticate", "Basic realm=\"Git\"")
+		w.Header().Set("WWW-Authenticate", "Bearer realm=\"omegaUp gitserver\"")
 		w.WriteHeader(http.StatusUnauthorized)
+		return githttp.AuthorizationDenied, ""
+	}
+	if problem != repositoryName {
+		w.WriteHeader(http.StatusForbidden)
 		return githttp.AuthorizationDenied, ""
 	}
 
 	log.Info(
 		"Auth",
 		"username", username,
+		"problem", problem,
 		"repository", repositoryName,
 		"operation", operation,
 	)
 	requestContext := request.FromContext(ctx)
+	// Right now only the frontend can issue requests, so we trust it completely.
 	requestContext.CanView = true
-	if username == "admin" {
-		requestContext.IsAdmin = true
-		requestContext.CanEdit = true
-		return githttp.AuthorizationAllowed, username
-	}
-	return githttp.AuthorizationAllowedRestricted, username
+	requestContext.IsAdmin = true
+	requestContext.CanEdit = true
+	return githttp.AuthorizationAllowed, username
 }
 
 func referenceDiscovery(
@@ -75,6 +113,7 @@ func referenceDiscovery(
 }
 
 type muxGitHandler struct {
+	log        log15.Logger
 	gitHandler http.Handler
 	zipHandler http.Handler
 }
@@ -85,6 +124,7 @@ func muxHandler(
 	log log15.Logger,
 ) http.Handler {
 	return &muxGitHandler{
+		log:        log,
 		gitHandler: gitserver.GitHandler(rootPath, protocol, log),
 		zipHandler: gitserver.ZipHandler(rootPath, protocol, log),
 	}
@@ -106,10 +146,21 @@ func main() {
 	stopChan := make(chan os.Signal)
 	signal.Notify(stopChan, os.Interrupt)
 
+	keyBytes, err := base64.StdEncoding.DecodeString(*publicKeyBase64)
+	if err != nil {
+		log.Error("failed to parse the base64-encoded public key", "err", err)
+		os.Exit(1)
+	}
+
+	auth := bearerAuthorization{
+		log:       log,
+		publicKey: ed25519.PublicKey(keyBytes),
+	}
+
 	protocol := gitserver.NewGitProtocol(
-		authorize,
+		auth.authorize,
 		referenceDiscovery,
-		false,
+		*allowDirectPushToMaster,
 		gitserver.OverallWallTimeHardLimit,
 		&gitserver.LibinteractiveCompiler{
 			LibinteractiveJarPath: *libinteractivePath,
