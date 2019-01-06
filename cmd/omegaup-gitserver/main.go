@@ -134,22 +134,25 @@ func main() {
 	}()
 	log.Info(fmt.Sprintf("git server ready for connections at http://localhost:%d", *port))
 
-	pprofServeMux := http.NewServeMux()
-	pprofServeMux.HandleFunc("/debug/pprof/", pprof.Index)
-	pprofServeMux.HandleFunc("/debug/pprof/cmdline", pprof.Cmdline)
-	pprofServeMux.HandleFunc("/debug/pprof/profile", pprof.Profile)
-	pprofServeMux.HandleFunc("/debug/pprof/symbol", pprof.Symbol)
-	pprofServeMux.HandleFunc("/debug/pprof/trace", pprof.Trace)
-	pprofServer := &http.Server{
-		Addr:    fmt.Sprintf("localhost:%d", *pprofPort),
-		Handler: pprofServeMux,
-	}
-	go func() {
-		if err := pprofServer.ListenAndServe(); err != nil {
-			log.Error("pprof ListenAndServe", "err", err)
+	var pprofServer *http.Server
+	if *pprofPort > 0 {
+		pprofServeMux := http.NewServeMux()
+		pprofServeMux.HandleFunc("/debug/pprof/", pprof.Index)
+		pprofServeMux.HandleFunc("/debug/pprof/cmdline", pprof.Cmdline)
+		pprofServeMux.HandleFunc("/debug/pprof/profile", pprof.Profile)
+		pprofServeMux.HandleFunc("/debug/pprof/symbol", pprof.Symbol)
+		pprofServeMux.HandleFunc("/debug/pprof/trace", pprof.Trace)
+		pprofServer := &http.Server{
+			Addr:    fmt.Sprintf("localhost:%d", *pprofPort),
+			Handler: pprofServeMux,
 		}
-	}()
-	log.Info(fmt.Sprintf("pprof server ready for connections at http://localhost:%d", *pprofPort))
+		go func() {
+			if err := pprofServer.ListenAndServe(); err != nil {
+				log.Error("pprof ListenAndServe", "err", err)
+			}
+		}()
+		log.Info(fmt.Sprintf("pprof server ready for connections at http://localhost:%d", *pprofPort))
+	}
 
 	<-stopChan
 
@@ -157,7 +160,9 @@ func main() {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	gitServer.Shutdown(ctx)
-	pprofServer.Shutdown(ctx)
+	if pprofServer != nil {
+		pprofServer.Shutdown(ctx)
+	}
 
 	log.Info("Server gracefully stopped.")
 }
