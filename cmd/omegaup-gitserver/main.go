@@ -28,6 +28,7 @@ var (
 	pprofPort               = flag.Int("pprof-port", 33862, "Port in which the pprof server will listen")
 	libinteractivePath      = flag.String("libinteractive-path", "/usr/share/java/libinteractive.jar", "Path of libinteractive.jar")
 	allowDirectPushToMaster = flag.Bool("allow-direct-push-to-master", false, "Allow direct push to master")
+	verbose                 = flag.Bool("verbose", false, "Verbose logging")
 	log                     log15.Logger
 )
 
@@ -141,7 +142,12 @@ func (h *muxGitHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 func main() {
 	flag.Parse()
-	log = base.StderrLog()
+	if *verbose {
+		log = base.StderrLog()
+	} else {
+		log = log15.New()
+		log.SetHandler(base.ErrorCallerStackHandler(log15.LvlInfo, log15.StderrHandler))
+	}
 
 	stopChan := make(chan os.Signal)
 	signal.Notify(stopChan, os.Interrupt)

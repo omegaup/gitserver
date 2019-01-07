@@ -4,6 +4,7 @@ import (
 	"archive/zip"
 	"bufio"
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"github.com/inconshreveable/log15"
@@ -16,6 +17,7 @@ import (
 	"io"
 	"io/ioutil"
 	"math/big"
+	"mime/multipart"
 	"net/http"
 	"os"
 	"path"
@@ -35,19 +37,28 @@ const (
 	OverallWallTimeHardLimit = common.Duration(time.Duration(60) * time.Second)
 )
 
-// A ConvertZipUpdateMask represents a bitfield of elements that will be
-// extracted from the .zip file and updated in the git branch.
-type ConvertZipUpdateMask int
+// A ZipMergeStrategy represents the strategy to use when merging the trees of
+// a .zip upload and its parent.
+type ZipMergeStrategy int
 
 const (
-	// ConvertZipUpdateStatements will extract the contents of the statements/
-	// directory.
-	ConvertZipUpdateStatements ConvertZipUpdateMask = 1 << iota
-	// ConvertZipUpdateNonStatements will extract everything that is not in the
-	// statements/ directory.
-	ConvertZipUpdateNonStatements
-	// ConvertZipUpdateAll extracts all entries from the .zip file.
-	ConvertZipUpdateAll = ConvertZipUpdateStatements | ConvertZipUpdateNonStatements
+	// ZipMergeStrategyOurs will use the parent commit's tree as-is without even
+	// looking at the contents of the .zip or doing any kind of merge.  This is
+	// exactly what what git-merge does with '-s ours'.
+	ZipMergeStrategyOurs ZipMergeStrategy = iota
+	// ZipMergeStrategyTheirs will use the tree that was contained in the .zip
+	// as-is without even looking at the parent tree or doing any kind of merge.
+	// This the opposite of ZipMergeStrategyOurs, and has no equivalent in
+	// git-merge.
+	ZipMergeStrategyTheirs
+	// ZipMergeStrategyStatementsOurs will keep the statements/ subtree from the
+	// parent commit as-is, and replace the rest of the tree with the contents of
+	// the .zip file.
+	ZipMergeStrategyStatementsOurs
+	// ZipMergeStrategyRecursiveTheirs will merge the contents of the .zip file
+	// with the parent commit's tree, preferring whatever is present in the .zip
+	// file. This is similar to what git-merge does with `-srecursive -Xtheirs`.
+	ZipMergeStrategyRecursiveTheirs
 )
 
 var (
@@ -132,6 +143,213 @@ libinteractive.jar
 		".gitattributes": "cases/* -diff -delta -merge -text -crlf\n",
 	}
 )
+
+func (z ZipMergeStrategy) String() string {
+	switch z {
+	case ZipMergeStrategyOurs:
+		return "ours"
+	case ZipMergeStrategyTheirs:
+		return "theirs"
+	case ZipMergeStrategyStatementsOurs:
+		return "statement-ours"
+	case ZipMergeStrategyRecursiveTheirs:
+		return "recursive-theirs"
+	}
+	return ""
+}
+
+// ParseZipMergeStrategy returns the corresponding ZipMergeStrategy for the provided name.
+func ParseZipMergeStrategy(name string) (ZipMergeStrategy, error) {
+	switch name {
+	case "ours":
+		return ZipMergeStrategyOurs, nil
+	case "theirs":
+		return ZipMergeStrategyTheirs, nil
+	case "statement-ours":
+		return ZipMergeStrategyStatementsOurs, nil
+	case "recursive-theirs":
+		return ZipMergeStrategyRecursiveTheirs, nil
+	}
+
+	return ZipMergeStrategyOurs, errors.Errorf("invalid value for ZipMergeStrategy: %q", name)
+}
+
+// UpdatedFile represents an updated file. Type is either "added", "deleted",
+// or "modified".
+type UpdatedFile struct {
+	Path string `json:"path"`
+	Type string `json:"type"`
+}
+
+type byPath []UpdatedFile
+
+func (p byPath) Len() int           { return len(p) }
+func (p byPath) Swap(i, j int)      { p[i], p[j] = p[j], p[i] }
+func (p byPath) Less(i, j int) bool { return p[i].Path < p[j].Path }
+
+// UpdateResult represents the result of running this command.
+type UpdateResult struct {
+	Status       string               `json:"status"`
+	Error        string               `json:"error,omitempty"`
+	UpdatedRefs  []githttp.UpdatedRef `json:"updated_refs,omitempty"`
+	UpdatedFiles []UpdatedFile        `json:"updated_files"`
+}
+
+func getAllFilesForCommit(
+	repo *git.Repository,
+	commitID *git.Oid,
+) (map[string]*git.Oid, error) {
+	if commitID.IsZero() {
+		return map[string]*git.Oid{}, nil
+	}
+
+	commit, err := repo.LookupCommit(commitID)
+	if err != nil {
+		return nil, base.ErrorWithCategory(
+			ErrInternalGit,
+			errors.Wrapf(
+				err,
+				"failed to lookup commit %s",
+				commitID.String(),
+			),
+		)
+	}
+	defer commit.Free()
+
+	tree, err := commit.Tree()
+	if err != nil {
+		return nil, base.ErrorWithCategory(
+			ErrInternalGit,
+			errors.Wrapf(
+				err,
+				"failed to lookup commit %s",
+				commitID.String(),
+			),
+		)
+	}
+	defer tree.Free()
+
+	commitFiles := make(map[string]*git.Oid)
+	if err := tree.Walk(func(name string, entry *git.TreeEntry) int {
+		if entry.Type != git.ObjectBlob {
+			return 0
+		}
+		filename := path.Join(name, entry.Name)
+		commitFiles[filename] = entry.Id
+		return 0
+	}); err != nil {
+		return nil, base.ErrorWithCategory(
+			ErrInternalGit,
+			errors.Wrapf(
+				err,
+				"failed to traverse tree for commit %s",
+				commitID.String(),
+			),
+		)
+	}
+
+	return commitFiles, nil
+}
+
+// GetUpdatedFiles returns the files that were updated in the master branch.
+func GetUpdatedFiles(
+	repo *git.Repository,
+	updatedRefs []githttp.UpdatedRef,
+) ([]UpdatedFile, error) {
+	var masterUpdatedRef *githttp.UpdatedRef
+	for _, updatedRef := range updatedRefs {
+		if updatedRef.Name != "refs/heads/master" {
+			continue
+		}
+		masterUpdatedRef = &updatedRef
+		break
+	}
+
+	if masterUpdatedRef == nil {
+		return nil, base.ErrorWithCategory(
+			ErrInternalGit,
+			errors.New("failed to find the updated master ref"),
+		)
+	}
+
+	fromCommitID, err := git.NewOid(masterUpdatedRef.From)
+	if err != nil {
+		return nil, base.ErrorWithCategory(
+			ErrInternalGit,
+			errors.Wrapf(
+				err,
+				"failed to parse the old OID '%s'",
+				masterUpdatedRef.From,
+			),
+		)
+	}
+
+	toCommitID, err := git.NewOid(masterUpdatedRef.To)
+	if err != nil {
+		return nil, base.ErrorWithCategory(
+			ErrInternalGit,
+			errors.Wrapf(
+				err,
+				"failed to parse the new OID '%s'",
+				masterUpdatedRef.To,
+			),
+		)
+	}
+
+	fromIDs, err := getAllFilesForCommit(repo, fromCommitID)
+	if err != nil {
+		return nil, base.ErrorWithCategory(
+			ErrInternalGit,
+			errors.Wrapf(
+				err,
+				"failed to get the old files for commit %s",
+				fromCommitID.String(),
+			),
+		)
+	}
+	toIDs, err := getAllFilesForCommit(repo, toCommitID)
+	if err != nil {
+		return nil, base.ErrorWithCategory(
+			ErrInternalGit,
+			errors.Wrapf(
+				err,
+				"failed to get the new files for commit %s",
+				toCommitID.String(),
+			),
+		)
+	}
+
+	var updatedFiles []UpdatedFile
+	// Deleted files.
+	for filename := range fromIDs {
+		if _, ok := toIDs[filename]; !ok {
+			updatedFiles = append(updatedFiles, UpdatedFile{
+				Path: filename,
+				Type: "deleted",
+			})
+		}
+	}
+
+	// Added / modified files.
+	for filename, toID := range toIDs {
+		if fromID, ok := fromIDs[filename]; ok {
+			if !fromID.Equal(toID) {
+				updatedFiles = append(updatedFiles, UpdatedFile{
+					Path: filename,
+					Type: "modified",
+				})
+			}
+		} else {
+			updatedFiles = append(updatedFiles, UpdatedFile{
+				Path: filename,
+				Type: "added",
+			})
+		}
+	}
+
+	sort.Sort(byPath(updatedFiles))
+	return updatedFiles, nil
+}
 
 func isTopLevelEntry(component string) bool {
 	for _, entry := range topLevelEntryNames {
@@ -227,11 +445,11 @@ func parseTestplan(testplan io.Reader, groupSettings map[string]map[string]*big.
 
 // CreatePackfile creates a packfile that contains a commit that contains the
 // specified contents plus a subset of the parent commit's tree, depending of
-// the value of updateMask.
+// the value of zipMergeStrategy.
 func CreatePackfile(
 	contents map[string]io.Reader,
 	settings *common.ProblemSettings,
-	updateMask ConvertZipUpdateMask,
+	zipMergeStrategy ZipMergeStrategy,
 	repo *git.Repository,
 	parent *git.Oid,
 	author, committer *git.Signature,
@@ -290,73 +508,76 @@ func CreatePackfile(
 	// .gitattributes is always overwritten.
 	delete(contents, ".gitattributes")
 
-	if settings != nil {
-		// If we were given an explicit settings object, that takes
-		// precedence over whatever was bundled in the .zip.
-	} else if r, ok := contents["settings.json"]; ok {
-		settings = &common.ProblemSettings{}
-		if err := json.NewDecoder(r).Decode(settings); err != nil {
-			return nil, base.ErrorWithCategory(
-				ErrJSONParseError,
-				errors.Wrap(
-					err,
-					"failed to parse settings.json",
-				),
-			)
-		}
-	} else {
-		settings = &common.ProblemSettings{
-			Limits: common.DefaultLimits,
-			Slow:   false,
-			Validator: common.ValidatorSettings{
-				Name: "token-caseless",
-			},
-		}
-	}
-	delete(contents, "settings.json")
-
-	// Information needed to build ProblemSettings.Cases.
-	groupSettings := make(map[string]map[string]*big.Rat)
-	if r, ok := contents["testplan"]; ok {
-		if err := parseTestplan(r, groupSettings); err != nil {
-			// parseTestplan already wrapped the error correctly.
-			return nil, err
-		}
-	} else {
-		for filename := range contents {
-			if !strings.HasPrefix(filename, "cases/") {
-				continue
+	if zipMergeStrategy != ZipMergeStrategyOurs &&
+		zipMergeStrategy != ZipMergeStrategyRecursiveTheirs {
+		if settings != nil {
+			// If we were given an explicit settings object, that takes
+			// precedence over whatever was bundled in the .zip.
+		} else if r, ok := contents["settings.json"]; ok {
+			settings = &common.ProblemSettings{}
+			if err := json.NewDecoder(r).Decode(settings); err != nil {
+				return nil, base.ErrorWithCategory(
+					ErrJSONParseError,
+					errors.Wrap(
+						err,
+						"failed to parse settings.json",
+					),
+				)
 			}
-			filename = strings.TrimPrefix(filename, "cases/")
-			if !strings.HasSuffix(filename, ".in") {
-				continue
+		} else {
+			settings = &common.ProblemSettings{
+				Limits: common.DefaultLimits,
+				Slow:   false,
+				Validator: common.ValidatorSettings{
+					Name: "token-caseless",
+				},
 			}
-			caseName := strings.TrimSuffix(filename, ".in")
-
-			addCaseName(caseName, groupSettings, big.NewRat(1, 1), false)
 		}
-	}
-	// Remove this file since it's redundant with settings.json.
-	delete(contents, "testplan")
+		delete(contents, "settings.json")
 
-	// Update the problem settings.
-	settings.Cases = make([]common.GroupSettings, 0)
-	for groupName, groupContents := range groupSettings {
-		var caseSettings []common.CaseSettings
-		for caseName, caseWeight := range groupContents {
-			caseSettings = append(caseSettings, common.CaseSettings{
-				Name:   caseName,
-				Weight: caseWeight,
+		// Information needed to build ProblemSettings.Cases.
+		groupSettings := make(map[string]map[string]*big.Rat)
+		if r, ok := contents["testplan"]; ok {
+			if err := parseTestplan(r, groupSettings); err != nil {
+				// parseTestplan already wrapped the error correctly.
+				return nil, err
+			}
+		} else {
+			for filename := range contents {
+				if !strings.HasPrefix(filename, "cases/") {
+					continue
+				}
+				filename = strings.TrimPrefix(filename, "cases/")
+				if !strings.HasSuffix(filename, ".in") {
+					continue
+				}
+				caseName := strings.TrimSuffix(filename, ".in")
+
+				addCaseName(caseName, groupSettings, big.NewRat(1, 1), false)
+			}
+		}
+		// Remove this file since it's redundant with settings.json.
+		delete(contents, "testplan")
+
+		// Update the problem settings.
+		settings.Cases = make([]common.GroupSettings, 0)
+		for groupName, groupContents := range groupSettings {
+			var caseSettings []common.CaseSettings
+			for caseName, caseWeight := range groupContents {
+				caseSettings = append(caseSettings, common.CaseSettings{
+					Name:   caseName,
+					Weight: caseWeight,
+				})
+			}
+			sort.Sort(common.ByCaseName(caseSettings))
+
+			settings.Cases = append(settings.Cases, common.GroupSettings{
+				Name:  groupName,
+				Cases: caseSettings,
 			})
 		}
-		sort.Sort(common.ByCaseName(caseSettings))
-
-		settings.Cases = append(settings.Cases, common.GroupSettings{
-			Name:  groupName,
-			Cases: caseSettings,
-		})
+		sort.Sort(common.ByGroupName(settings.Cases))
 	}
-	sort.Sort(common.ByGroupName(settings.Cases))
 
 	// libinteractive samples don't require an .out file. Generate one just for
 	// validation's sake.
@@ -433,7 +654,7 @@ func CreatePackfile(
 		}
 	}
 
-	{
+	if settings != nil {
 		var buf bytes.Buffer
 		encoder := json.NewEncoder(&buf)
 		encoder.SetIndent("", "\t")
@@ -532,6 +753,7 @@ func CreatePackfile(
 	}
 
 	var parentCommits []*git.Commit
+	var parentTree *git.Tree
 	if !parent.IsZero() {
 		parentCommit, err := repo.LookupCommit(parent)
 		if err != nil {
@@ -547,7 +769,7 @@ func CreatePackfile(
 		defer parentCommit.Free()
 		parentCommits = append(parentCommits, parentCommit)
 
-		parentTree, err := parentCommit.Tree()
+		parentTree, err = parentCommit.Tree()
 		if err != nil {
 			return nil, base.ErrorWithCategory(
 				ErrInternalGit,
@@ -560,27 +782,26 @@ func CreatePackfile(
 		}
 		defer parentTree.Free()
 
-		for i := uint64(0); i < parentTree.EntryCount(); i++ {
-			entry := parentTree.EntryByIndex(i)
+		if zipMergeStrategy == ZipMergeStrategyStatementsOurs {
+			// This merge strategy takes the whole statements subtree as-is, so we
+			// avoid performing an actual tree merge.
+			for i := uint64(0); i < parentTree.EntryCount(); i++ {
+				entry := parentTree.EntryByIndex(i)
 
-			if updateMask&ConvertZipUpdateStatements != 0 &&
-				entry.Name == "statements" {
-				continue
-			}
-			if updateMask&ConvertZipUpdateNonStatements != 0 &&
-				entry.Name != "statements" {
-				continue
-			}
+				if entry.Name != "statements" {
+					continue
+				}
 
-			if err = treebuilder.Insert(entry.Name, entry.Id, entry.Filemode); err != nil {
-				return nil, base.ErrorWithCategory(
-					ErrInternalGit,
-					errors.Wrapf(
-						err,
-						"failed to insert file %s into treebuilder",
-						entry.Name,
-					),
-				)
+				if err = treebuilder.Insert(entry.Name, entry.Id, entry.Filemode); err != nil {
+					return nil, base.ErrorWithCategory(
+						ErrInternalGit,
+						errors.Wrapf(
+							err,
+							"failed to insert file %s into treebuilder",
+							entry.Name,
+						),
+					)
+				}
 			}
 		}
 	}
@@ -595,6 +816,45 @@ func CreatePackfile(
 			),
 		)
 	}
+
+	if parentTree != nil && (zipMergeStrategy == ZipMergeStrategyOurs ||
+		zipMergeStrategy == ZipMergeStrategyRecursiveTheirs) {
+		// If we could not do the easy merge strategies (theirs and
+		// statement-ours), we need to perform an actual merge of the trees.
+		// Regardless of which of the two merge strategies was chosen, we will be
+		// choosing the files in the recently created tree because we have already
+		// filtered out all of the files that should not have been in the tree.
+		tree, err := repo.LookupTree(treeID)
+		if err != nil {
+			return nil, base.ErrorWithCategory(
+				ErrInternalGit,
+				errors.Wrap(
+					err,
+					"failed to lookup recently-created tree",
+				),
+			)
+		}
+		defer tree.Free()
+
+		mergedTree, err := githttp.MergeTrees(
+			repo,
+			log,
+			tree,
+			parentTree,
+		)
+		if err != nil {
+			return nil, base.ErrorWithCategory(
+				ErrInternalGit,
+				errors.Wrap(
+					err,
+					"failed to merge tree",
+				),
+			)
+		}
+		defer mergedTree.Free()
+		treeID = mergedTree.Id()
+	}
+
 	log.Debug("Final tree created", "id", treeID.String())
 	tree, err := repo.LookupTree(treeID)
 	if err != nil {
@@ -694,12 +954,101 @@ func CreatePackfile(
 	return newCommitID, nil
 }
 
+func getUpdatedProblemSettings(
+	problemSettings *common.ProblemSettings,
+	zipMergeStrategy ZipMergeStrategy,
+	repo *git.Repository,
+	parent *git.Oid,
+) (*common.ProblemSettings, error) {
+	parentCommit, err := repo.LookupCommit(parent)
+	if err != nil {
+		return nil, base.ErrorWithCategory(
+			ErrInternalGit,
+			errors.Wrapf(
+				err,
+				"failed to find parent commit %s",
+				parent.String(),
+			),
+		)
+	}
+	defer parentCommit.Free()
+
+	parentTree, err := parentCommit.Tree()
+	if err != nil {
+		return nil, base.ErrorWithCategory(
+			ErrInternalGit,
+			errors.Wrapf(
+				err,
+				"failed to find tree for parent commit %s",
+				parentCommit,
+			),
+		)
+	}
+	defer parentTree.Free()
+
+	var updatedProblemSettings common.ProblemSettings
+	entry := parentTree.EntryByName("settings.json")
+	if entry == nil {
+		return nil, base.ErrorWithCategory(
+			ErrInternalGit,
+			errors.New("failed to find settings.json"),
+		)
+	}
+	blob, err := repo.LookupBlob(entry.Id)
+	if err != nil {
+		return nil, base.ErrorWithCategory(
+			ErrInternalGit,
+			errors.Wrap(
+				err,
+				"failed to lookup settings.json",
+			),
+		)
+	}
+	defer blob.Free()
+
+	if err := json.Unmarshal(blob.Contents(), &updatedProblemSettings); err != nil {
+		return nil, base.ErrorWithCategory(
+			ErrJSONParseError,
+			errors.Wrap(
+				err,
+				"settings.json",
+			),
+		)
+	}
+
+	if updatedProblemSettings.Validator.Name != problemSettings.Validator.Name {
+		if updatedProblemSettings.Validator.Name == "custom" {
+			return nil, base.ErrorWithCategory(
+				ErrProblemBadLayout,
+				errors.Errorf(
+					"problem with unused validator",
+				),
+			)
+		}
+		if problemSettings.Validator.Name == "custom" {
+			return nil, base.ErrorWithCategory(
+				ErrProblemBadLayout,
+				errors.Errorf(
+					"problem with custom validator missing a validator",
+				),
+			)
+		}
+	}
+
+	updatedProblemSettings.Limits = problemSettings.Limits
+	updatedProblemSettings.Validator.Name = problemSettings.Validator.Name
+	updatedProblemSettings.Validator.Tolerance = problemSettings.Validator.Tolerance
+	updatedProblemSettings.Validator.Limits = problemSettings.Validator.Limits
+
+	return &updatedProblemSettings, nil
+}
+
 // ConvertZipToPackfile receives a .zip file from the caller and converts it
 // into a git packfile that can be used to update the repository.
 func ConvertZipToPackfile(
 	zipReader *zip.Reader,
 	settings *common.ProblemSettings,
-	updateMask ConvertZipUpdateMask,
+	zipMergeStrategy ZipMergeStrategy,
 	repo *git.Repository,
 	parent *git.Oid,
 	author, committer *git.Signature,
@@ -708,99 +1057,113 @@ func ConvertZipToPackfile(
 	w io.Writer,
 	log log15.Logger,
 ) (*git.Oid, error) {
-	if updateMask == 0 {
-		if _, err := w.Write(githttp.EmptyPackfile); err != nil {
-			return nil, base.ErrorWithCategory(
-				ErrInternal,
-				errors.Wrap(
-					err,
-					"failed to write the packfile",
-				),
-			)
-		}
-		return parent, nil
-	}
-
-	longestPrefix := getLongestPathPrefix(zipReader)
 	contents := make(map[string]io.Reader)
+	longestPrefix := getLongestPathPrefix(zipReader)
 
 	inCases := make(map[string]struct{})
 	outCases := make(map[string]struct{})
 
 	hasStatements := false
-	for _, file := range zipReader.File {
-		zipfilePath := path.Clean(file.Name)
-		components := strings.Split(zipfilePath, "/")
-		if len(longestPrefix) >= len(components) || !hasPathPrefix(longestPrefix, components) {
-			continue
-		}
-		// BuildTree only cares about files.
-		if file.FileInfo().IsDir() {
-			continue
-		}
+	if zipMergeStrategy != ZipMergeStrategyOurs {
+		for _, file := range zipReader.File {
+			zipfilePath := path.Clean(file.Name)
+			components := strings.Split(zipfilePath, "/")
+			if len(longestPrefix) >= len(components) || !hasPathPrefix(longestPrefix, components) {
+				continue
+			}
+			// BuildTree only cares about files.
+			if file.FileInfo().IsDir() {
+				continue
+			}
 
-		topLevelComponent := components[len(longestPrefix)]
-		if (updateMask&ConvertZipUpdateStatements == 0 ||
-			topLevelComponent != "statements") &&
-			(updateMask&ConvertZipUpdateNonStatements == 0 ||
-				topLevelComponent == "statements" ||
-				!isTopLevelEntry(topLevelComponent)) {
-			continue
-		}
+			topLevelComponent := components[len(longestPrefix)]
+			if zipMergeStrategy == ZipMergeStrategyStatementsOurs &&
+				topLevelComponent == "statements" {
+				continue
+			}
 
-		isValidFile := false
-		trimmedZipfilePath := strings.Join(components[len(longestPrefix):], "/")
-		for _, description := range DefaultCommitDescriptions {
-			if description.ContainsPath(trimmedZipfilePath) {
+			isValidFile := false
+			trimmedZipfilePath := strings.Join(components[len(longestPrefix):], "/")
+			for _, description := range DefaultCommitDescriptions {
+				if description.ContainsPath(trimmedZipfilePath) {
+					isValidFile = true
+					break
+				}
+			}
+
+			// testplan is not going to be part of the final tree, but we still add it
+			// because it will be integrated into the settings.json file.
+			if trimmedZipfilePath == "testplan" {
 				isValidFile = true
-				break
+			}
+
+			if !isValidFile {
+				log.Info("Skipping file", "path", zipfilePath)
+			}
+
+			zipFile, err := file.Open()
+			if err != nil {
+				return nil, base.ErrorWithCategory(
+					ErrInvalidZipFilename,
+					errors.Wrapf(
+						err,
+						"failed to open file %s",
+						zipfilePath,
+					),
+				)
+			}
+			defer zipFile.Close()
+			var r io.Reader = zipFile
+
+			componentSubpath := strings.Join(components[len(longestPrefix)+1:], "/")
+
+			if topLevelComponent == "statements" {
+				if strings.HasSuffix(componentSubpath, ".markdown") || strings.HasSuffix(componentSubpath, ".md") {
+					hasStatements = true
+				}
+			} else if topLevelComponent == "cases" {
+				caseName := strings.TrimSuffix(componentSubpath, filepath.Ext(componentSubpath))
+				if strings.HasSuffix(componentSubpath, ".in") {
+					inCases[caseName] = struct{}{}
+				} else if strings.HasSuffix(componentSubpath, ".out") && acceptsSubmissions {
+					outCases[caseName] = struct{}{}
+				}
+			}
+
+			contents[trimmedZipfilePath] = r
+		}
+	}
+
+	if zipMergeStrategy == ZipMergeStrategyOurs ||
+		zipMergeStrategy == ZipMergeStrategyRecursiveTheirs {
+		if settings != nil {
+			var err error
+			if settings, err = getUpdatedProblemSettings(
+				settings,
+				zipMergeStrategy,
+				repo,
+				parent,
+			); err != nil {
+				return nil, err
 			}
 		}
 
-		// testplan is not going to be part of the final tree, but we still add it
-		// because it will be integrated into the settings.json file.
-		if trimmedZipfilePath == "testplan" {
-			isValidFile = true
-		}
-
-		if !isValidFile {
-			log.Info("Skipping file", "path", zipfilePath)
-		}
-
-		zipFile, err := file.Open()
-		if err != nil {
-			return nil, base.ErrorWithCategory(
-				ErrInvalidZipFilename,
-				errors.Wrapf(
-					err,
-					"failed to open file %s",
-					zipfilePath,
-				),
-			)
-		}
-		defer zipFile.Close()
-		var r io.Reader = zipFile
-
-		componentSubpath := strings.Join(components[len(longestPrefix)+1:], "/")
-
-		if topLevelComponent == "statements" {
-			if strings.HasSuffix(componentSubpath, ".markdown") || strings.HasSuffix(componentSubpath, ".md") {
-				hasStatements = true
-			}
-		} else if topLevelComponent == "cases" {
-			caseName := strings.TrimSuffix(componentSubpath, filepath.Ext(componentSubpath))
-			if strings.HasSuffix(componentSubpath, ".in") {
-				inCases[caseName] = struct{}{}
-			} else if strings.HasSuffix(componentSubpath, ".out") && acceptsSubmissions {
-				outCases[caseName] = struct{}{}
-			}
-		}
-
-		contents[trimmedZipfilePath] = r
+		return CreatePackfile(
+			contents,
+			settings,
+			zipMergeStrategy,
+			repo,
+			parent,
+			author,
+			committer,
+			commitMessage,
+			w,
+			log,
+		)
 	}
 
 	// Perform a few validations.
-	if !hasStatements {
+	if zipMergeStrategy == ZipMergeStrategyTheirs && !hasStatements {
 		return nil, ErrNoStatements
 	}
 	if acceptsSubmissions {
@@ -836,7 +1199,7 @@ func ConvertZipToPackfile(
 	return CreatePackfile(
 		contents,
 		settings,
-		updateMask,
+		zipMergeStrategy,
 		repo,
 		parent,
 		author,
@@ -845,6 +1208,117 @@ func ConvertZipToPackfile(
 		w,
 		log,
 	)
+}
+
+// PushZip reads the contents of the .zip file pointed at to by zipReader,
+// creates a packfile out of it, and pushes it to the master branch of the
+// repository.
+func PushZip(
+	ctx context.Context,
+	zipReader *zip.Reader,
+	authorizationLevel githttp.AuthorizationLevel,
+	repo *git.Repository,
+	lockfile *githttp.Lockfile,
+	authorUsername string,
+	commitMessage string,
+	problemSettings *common.ProblemSettings,
+	zipMergeStrategy ZipMergeStrategy,
+	acceptsSubmissions bool,
+	protocol *githttp.GitProtocol,
+	log log15.Logger,
+) (*UpdateResult, error) {
+	oldOid := &git.Oid{}
+	var reference *git.Reference
+	if ok, _ := repo.IsHeadUnborn(); !ok {
+		var err error
+		reference, err = repo.Head()
+		if err != nil {
+			return nil, base.ErrorWithCategory(
+				ErrInternalGit,
+				errors.Wrap(
+					err,
+					"failed to get the repository's HEAD",
+				),
+			)
+		}
+		defer reference.Free()
+		oldOid = reference.Target()
+	}
+
+	signature := &git.Signature{
+		Name:  authorUsername,
+		Email: fmt.Sprintf("%s@omegaup", authorUsername),
+		When:  time.Now(),
+	}
+
+	packfile, err := ioutil.TempFile("", "gitserver-packfile")
+	if err != nil {
+		return nil, err
+	}
+	defer os.Remove(packfile.Name())
+
+	newOid, err := ConvertZipToPackfile(
+		zipReader,
+		problemSettings,
+		zipMergeStrategy,
+		repo,
+		oldOid,
+		signature,
+		signature,
+		commitMessage,
+		acceptsSubmissions,
+		packfile,
+		log,
+	)
+	if err != nil {
+		return nil, base.ErrorWithCategory(
+			githttp.ErrBadRequest,
+			err,
+		)
+	}
+
+	packfile.Seek(0, 0)
+	updatedRefs, err, unpackErr := protocol.PushPackfile(
+		ctx,
+		repo,
+		lockfile,
+		authorizationLevel,
+		[]*githttp.GitCommand{
+			{
+				Old:           oldOid,
+				New:           newOid,
+				ReferenceName: "refs/heads/master",
+				Reference:     nil,
+			},
+		},
+		packfile,
+	)
+
+	if unpackErr != nil {
+		return nil, base.ErrorWithCategory(
+			githttp.ErrBadRequest,
+			errors.Wrap(
+				err,
+				"failed to push .zip",
+			),
+		)
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	updatedFiles, err := GetUpdatedFiles(repo, updatedRefs)
+	if err != nil {
+		return nil, errors.Wrap(
+			err,
+			"failed to get list of updated files",
+		)
+	}
+	return &UpdateResult{
+		Status:       "ok",
+		UpdatedRefs:  updatedRefs,
+		UpdatedFiles: updatedFiles,
+	}, nil
 }
 
 type zipUploadHandler struct {
@@ -872,27 +1346,67 @@ func (h *zipUploadHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusMethodNotAllowed)
 		return
 	}
-	if err := r.ParseMultipartForm((32 * common.Mebibyte).Bytes()); err != nil {
-		h.log.Error("Unable to parse multipart form", "err", err)
-		w.WriteHeader(http.StatusBadRequest)
+
+	var requestZip io.ReadCloser
+	var paramValue func(string) string
+	if strings.HasPrefix(r.Header.Get("Content-Type"), "multipart/form-data") {
+		if err := r.ParseMultipartForm((32 * common.Mebibyte).Bytes()); err != nil {
+			h.log.Error("Unable to parse multipart form", "err", err)
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
+		paramValue = func(name string) string {
+			return r.PostFormValue(name)
+		}
+		var requestZipHeader *multipart.FileHeader
+		var err error
+		requestZip, requestZipHeader, err = r.FormFile("contents")
+		if err != nil {
+			h.log.Error("Invalid contents", "err", err)
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
+		defer requestZip.Close()
+		if requestZipHeader.Size >= maxAllowedZipSize.Bytes() {
+			w.WriteHeader(http.StatusRequestEntityTooLarge)
+			return
+		}
+	} else if r.Header.Get("Content-Type") == "application/zip" {
+		paramValue = func(name string) string {
+			return r.URL.Query().Get(name)
+		}
+		requestZip = r.Body
+	} else {
+		h.log.Error("Bad content type", "Content-Type", r.Header.Get("Content-Type"))
+		w.WriteHeader(http.StatusUnsupportedMediaType)
 		return
 	}
-	if r.PostFormValue("message") == "" {
+
+	commitMessage := paramValue("message")
+	if commitMessage == "" {
 		h.log.Error("Missing 'message' field")
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
-	requestZip, requestZipHeader, err := r.FormFile("contents")
+	var problemSettings *common.ProblemSettings
+	if paramValue("settings") != "" {
+		var unmarshaledSettings common.ProblemSettings
+		if err := json.Unmarshal([]byte(paramValue("settings")), &unmarshaledSettings); err != nil {
+			h.log.Error("invalid settings", "err", err)
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
+		problemSettings = &unmarshaledSettings
+	}
+	acceptsSubmissions := (paramValue("acceptsSubmissions") == "" ||
+		paramValue("acceptsSubmissions") == "true")
+	zipMergeStrategy, err := ParseZipMergeStrategy(paramValue("mergeStrategy"))
 	if err != nil {
-		h.log.Error("Invalid contents", "err", err)
+		h.log.Error("invalid merge strategy", "mergeStrategy", paramValue("mergeStrategy"))
 		w.WriteHeader(http.StatusBadRequest)
-		return
+		os.Exit(1)
 	}
-	defer requestZip.Close()
-	if requestZipHeader.Size == maxAllowedZipSize.Bytes() {
-		w.WriteHeader(http.StatusRequestEntityTooLarge)
-		return
-	}
+
 	ctx := request.NewContext(r.Context())
 
 	create := r.URL.Query().Get("create") != ""
@@ -906,8 +1420,10 @@ func (h *zipUploadHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	)
 	if _, err := os.Stat(repositoryPath); os.IsNotExist(err) != create {
 		if create {
+			h.log.Error("Creating on top of an existing directory", "path", repositoryPath)
 			w.WriteHeader(http.StatusConflict)
 		} else {
+			h.log.Error("Updating a missing directory", "path", repositoryPath)
 			w.WriteHeader(http.StatusNotFound)
 		}
 		return
@@ -927,15 +1443,17 @@ func (h *zipUploadHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	zipSize, err := io.Copy(tempfile, &io.LimitedReader{R: requestZip, N: maxAllowedZipSize.Bytes()})
 	if err != nil {
+		h.log.Error("failed to copy zip", "err", err, "zipSize", zipSize)
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
-	if zipSize == maxAllowedZipSize.Bytes() {
+	if zipSize >= maxAllowedZipSize.Bytes() {
 		w.WriteHeader(http.StatusRequestEntityTooLarge)
 		return
 	}
 	zipReader, err := zip.OpenReader(tempfile.Name())
 	if err != nil {
+		h.log.Error("failed to read zip", "err", err)
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
@@ -954,12 +1472,14 @@ func (h *zipUploadHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if create {
 		repo, err = InitRepository(repositoryPath)
 		if err != nil {
+			h.log.Error("failed to init repository", "err", err)
 			w.WriteHeader(http.StatusInternalServerError)
 			return
 		}
 	} else {
 		repo, err = git.OpenRepository(repositoryPath)
 		if err != nil {
+			h.log.Error("failed to open repository", "err", err)
 			w.WriteHeader(http.StatusInternalServerError)
 			return
 		}
@@ -977,59 +1497,36 @@ func (h *zipUploadHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	defer lockfile.Unlock()
 
-	oldOid := &git.Oid{}
-	signature := &git.Signature{
-		Name:  username,
-		Email: fmt.Sprintf("%s@omegaup", username),
-		When:  time.Now(),
-	}
-	var packfile bytes.Buffer
-	newOid, err := ConvertZipToPackfile(
+	updateResult, err := PushZip(
+		ctx,
 		&zipReader.Reader,
-		nil,
-		ConvertZipUpdateAll,
+		level,
 		repo,
-		oldOid,
-		signature,
-		signature,
-		r.PostFormValue("message"),
-		true,
-		&packfile,
+		lockfile,
+		username,
+		commitMessage,
+		problemSettings,
+		zipMergeStrategy,
+		acceptsSubmissions,
+		h.protocol,
 		h.log,
 	)
 	if err != nil {
-		w.WriteHeader(http.StatusBadRequest)
-		return
+		h.log.Error("push failed", "path", repositoryPath, "err", err)
+		cause := githttp.WriteHeader(w, err, false)
+
+		updateResult = &UpdateResult{
+			Status: "error",
+			Error:  cause.Error(),
+		}
+	} else {
+		h.log.Info("push successful", "path", repositoryPath, "result", updateResult)
+		w.WriteHeader(http.StatusOK)
 	}
 
-	_, err, unpackErr := h.protocol.PushPackfile(
-		ctx,
-		repo,
-		lockfile,
-		level,
-		[]*githttp.GitCommand{
-			{
-				Old:           oldOid,
-				New:           newOid,
-				ReferenceName: "refs/changes/foo",
-				Reference:     nil,
-			},
-		},
-		&packfile,
-	)
-
-	if err != nil {
-		h.log.Error("Failed to push .zip", "err", err)
-		w.WriteHeader(http.StatusInternalServerError)
-		return
-	}
-	if unpackErr != nil {
-		h.log.Error("Failed to push .zip", "err", unpackErr)
-		w.WriteHeader(http.StatusBadRequest)
-		return
-	}
-
-	w.WriteHeader(http.StatusOK)
+	encoder := json.NewEncoder(w)
+	encoder.SetIndent("", "\t")
+	encoder.Encode(&updateResult)
 }
 
 // ZipHandler is the HTTP handler that allows uploading .zip files.

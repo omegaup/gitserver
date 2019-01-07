@@ -353,7 +353,7 @@ func convertCommitToPackfile(
 	return gitserver.CreatePackfile(
 		contents,
 		settings,
-		gitserver.ConvertZipUpdateAll,
+		gitserver.ZipMergeStrategyTheirs,
 		newRepo,
 		parentID,
 		originalCommit.Author(),

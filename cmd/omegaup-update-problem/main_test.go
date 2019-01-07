@@ -1,6 +1,8 @@
 package main
 
 import (
+	"archive/zip"
+	"bytes"
 	"github.com/inconshreveable/log15"
 	git "github.com/lhchavez/git2go"
 	"github.com/omegaup/githttp"
@@ -24,12 +26,6 @@ func getTreeOid(t *testing.T, extraFileContents map[string]io.Reader, log log15.
 		defer os.RemoveAll(tmpdir)
 	}
 
-	tmpfile, err := ioutil.TempFile("", "zipfile")
-	if err != nil {
-		t.Fatalf("Failed to create tempfile: %v", err)
-	}
-	defer os.Remove(tmpfile.Name())
-
 	fileContents := map[string]io.Reader{
 		"cases/0.in":             strings.NewReader("1 2"),
 		"cases/0.out":            strings.NewReader("3"),
@@ -42,8 +38,8 @@ func getTreeOid(t *testing.T, extraFileContents map[string]io.Reader, log log15.
 	if err != nil {
 		t.Fatalf("Failed to create zip: %v", err)
 	}
-
-	if _, err = tmpfile.Write(zipContents); err != nil {
+	zipReader, err := zip.NewReader(bytes.NewReader(zipContents), int64(len(zipContents)))
+	if err != nil {
 		t.Fatalf("Failed to write zip: %v", err)
 	}
 
@@ -59,13 +55,13 @@ func getTreeOid(t *testing.T, extraFileContents map[string]io.Reader, log log15.
 	defer lockfile.Unlock()
 
 	if _, err := commitZipFile(
-		tmpfile.Name(),
+		zipReader,
 		repo,
 		lockfile,
 		"test",
 		"initial commit",
 		nil,
-		gitserver.ConvertZipUpdateAll,
+		gitserver.ZipMergeStrategyTheirs,
 		true,
 		log,
 	); err != nil {
@@ -204,12 +200,6 @@ func TestProblemUpdateZip(t *testing.T) {
 		defer os.RemoveAll(tmpdir)
 	}
 
-	tmpfile, err := ioutil.TempFile("", "zipfile")
-	if err != nil {
-		t.Fatalf("Failed to create tempfile: %v", err)
-	}
-	defer os.Remove(tmpfile.Name())
-
 	repo, err := gitserver.InitRepository(tmpdir)
 	if err != nil {
 		t.Fatalf("Failed to initialize bare repository: %v", err)
@@ -232,23 +222,19 @@ func TestProblemUpdateZip(t *testing.T) {
 		if err != nil {
 			t.Fatalf("Failed to create zip: %v", err)
 		}
-		if err := tmpfile.Truncate(0); err != nil {
-			t.Fatalf("Failed to truncate: %v", err)
-		}
-		if _, err := tmpfile.Seek(0, 0); err != nil {
-			t.Fatalf("Failed to seek: %v", err)
-		}
-		if _, err = tmpfile.Write(zipContents); err != nil {
+		zipReader, err := zip.NewReader(bytes.NewReader(zipContents), int64(len(zipContents)))
+		if err != nil {
 			t.Fatalf("Failed to write zip: %v", err)
 		}
+
 		updateResult, err := commitZipFile(
-			tmpfile.Name(),
+			zipReader,
 			repo,
 			lockfile,
 			"test",
 			"initial commit",
 			nil,
-			gitserver.ConvertZipUpdateAll,
+			gitserver.ZipMergeStrategyTheirs,
 			true,
 			log,
 		)
@@ -262,7 +248,7 @@ func TestProblemUpdateZip(t *testing.T) {
 			t.Fatalf("Failed to acquire the lockfile: %v", err)
 		}
 
-		expectedUpdatedFiles := []UpdatedFile{
+		expectedUpdatedFiles := []gitserver.UpdatedFile{
 			{".gitattributes", "added"},
 			{".gitignore", "added"},
 			{"cases/0.in", "added"},
@@ -291,23 +277,19 @@ func TestProblemUpdateZip(t *testing.T) {
 		if err != nil {
 			t.Fatalf("Failed to create zip: %v", err)
 		}
-		if err := tmpfile.Truncate(0); err != nil {
-			t.Fatalf("Failed to truncate: %v", err)
-		}
-		if _, err := tmpfile.Seek(0, 0); err != nil {
-			t.Fatalf("Failed to seek: %v", err)
-		}
-		if _, err = tmpfile.Write(zipContents); err != nil {
+		zipReader, err := zip.NewReader(bytes.NewReader(zipContents), int64(len(zipContents)))
+		if err != nil {
 			t.Fatalf("Failed to write zip: %v", err)
 		}
+
 		updateResult, err := commitZipFile(
-			tmpfile.Name(),
+			zipReader,
 			repo,
 			lockfile,
 			"test",
 			"fix a typo",
 			nil,
-			gitserver.ConvertZipUpdateAll,
+			gitserver.ZipMergeStrategyTheirs,
 			true,
 			log,
 		)
@@ -321,7 +303,7 @@ func TestProblemUpdateZip(t *testing.T) {
 			t.Fatalf("Failed to acquire the lockfile: %v", err)
 		}
 
-		expectedUpdatedFiles := []UpdatedFile{
+		expectedUpdatedFiles := []gitserver.UpdatedFile{
 			{"statements/es.markdown", "modified"},
 		}
 		if !reflect.DeepEqual(expectedUpdatedFiles, updateResult.UpdatedFiles) {
@@ -349,12 +331,6 @@ func TestProblemUpdateBlobs(t *testing.T) {
 		defer os.RemoveAll(tmpdir)
 	}
 
-	tmpfile, err := ioutil.TempFile("", "zipfile")
-	if err != nil {
-		t.Fatalf("Failed to create tempfile: %v", err)
-	}
-	defer os.Remove(tmpfile.Name())
-
 	repo, err := gitserver.InitRepository(tmpdir)
 	if err != nil {
 		t.Fatalf("Failed to initialize bare repository: %v", err)
@@ -377,23 +353,19 @@ func TestProblemUpdateBlobs(t *testing.T) {
 		if err != nil {
 			t.Fatalf("Failed to create zip: %v", err)
 		}
-		if err := tmpfile.Truncate(0); err != nil {
-			t.Fatalf("Failed to truncate: %v", err)
-		}
-		if _, err := tmpfile.Seek(0, 0); err != nil {
-			t.Fatalf("Failed to seek: %v", err)
-		}
-		if _, err = tmpfile.Write(zipContents); err != nil {
+		zipReader, err := zip.NewReader(bytes.NewReader(zipContents), int64(len(zipContents)))
+		if err != nil {
 			t.Fatalf("Failed to write zip: %v", err)
 		}
+
 		updateResult, err := commitZipFile(
-			tmpfile.Name(),
+			zipReader,
 			repo,
 			lockfile,
 			"test",
 			"initial commit",
 			nil,
-			gitserver.ConvertZipUpdateAll,
+			gitserver.ZipMergeStrategyTheirs,
 			true,
 			log,
 		)
@@ -407,7 +379,7 @@ func TestProblemUpdateBlobs(t *testing.T) {
 			t.Fatalf("Failed to acquire the lockfile: %v", err)
 		}
 
-		expectedUpdatedFiles := []UpdatedFile{
+		expectedUpdatedFiles := []gitserver.UpdatedFile{
 			{".gitattributes", "added"},
 			{".gitignore", "added"},
 			{"cases/0.in", "added"},

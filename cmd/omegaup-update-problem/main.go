@@ -20,7 +20,6 @@ import (
 	"os"
 	"path"
 	"path/filepath"
-	"sort"
 	"time"
 )
 
@@ -32,35 +31,19 @@ var (
 
 	// Flags that are used when updating a repository with a .zip.
 	zipPath            = flag.String("zip-path", "", "Path of the .zip file")
-	updateCases        = flag.Bool("update-cases", true, "Update cases")
-	updateStatements   = flag.Bool("update-statements", true, "Update statements")
+	mergeStrategyName  = flag.String("merge-strategy", "theirs", "Merge strategy to use. Valid values are 'ours', 'theirs', 'statement-ours', and 'recursive-theirs'")
 	acceptsSubmissions = flag.Bool("accepts-submissions", true, "Problem accepts submissions")
 	libinteractivePath = flag.String("libinteractive-path", "/usr/share/java/libinteractive.jar", "Path of libinteractive.jar")
 
 	// Flags that are used when updating a repository with a []BlobUpdate.
 	blobUpdateJSON = flag.String("blob-update", "", "Update a subset of the blobs")
+
+	// An empty .zip file.
+	emptyZipFile = []byte{
+		0x50, 0x4b, 0x05, 0x06, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+	}
 )
-
-// UpdatedFile represents an updated file. Type is either "added", "deleted",
-// or "modified".
-type UpdatedFile struct {
-	Path string `json:"path"`
-	Type string `json:"type"`
-}
-
-type byPath []UpdatedFile
-
-func (p byPath) Len() int           { return len(p) }
-func (p byPath) Swap(i, j int)      { p[i], p[j] = p[j], p[i] }
-func (p byPath) Less(i, j int) bool { return p[i].Path < p[j].Path }
-
-// UpdateResult represents the result of running this command.
-type UpdateResult struct {
-	Status       string               `json:"status"`
-	Error        string               `json:"error,omitempty"`
-	UpdatedRefs  []githttp.UpdatedRef `json:"updated_refs,omitempty"`
-	UpdatedFiles []UpdatedFile        `json:"updated_files"`
-}
 
 // BlobUpdate represents updating a single blob in the repository.
 type BlobUpdate struct {
@@ -68,215 +51,17 @@ type BlobUpdate struct {
 	ContentsPath string `json:"contents_path"`
 }
 
-func getAllFilesForCommit(
-	repo *git.Repository,
-	commitID *git.Oid,
-) (map[string]*git.Oid, error) {
-	if commitID.IsZero() {
-		return map[string]*git.Oid{}, nil
-	}
-
-	commit, err := repo.LookupCommit(commitID)
-	if err != nil {
-		return nil, base.ErrorWithCategory(
-			gitserver.ErrInternalGit,
-			errors.Wrapf(
-				err,
-				"failed to lookup commit %s",
-				commitID.String(),
-			),
-		)
-	}
-	defer commit.Free()
-
-	tree, err := commit.Tree()
-	if err != nil {
-		return nil, base.ErrorWithCategory(
-			gitserver.ErrInternalGit,
-			errors.Wrapf(
-				err,
-				"failed to lookup commit %s",
-				commitID.String(),
-			),
-		)
-	}
-	defer tree.Free()
-
-	commitFiles := make(map[string]*git.Oid)
-	if err := tree.Walk(func(name string, entry *git.TreeEntry) int {
-		if entry.Type != git.ObjectBlob {
-			return 0
-		}
-		filename := path.Join(name, entry.Name)
-		commitFiles[filename] = entry.Id
-		return 0
-	}); err != nil {
-		return nil, base.ErrorWithCategory(
-			gitserver.ErrInternalGit,
-			errors.Wrapf(
-				err,
-				"failed to traverse tree for commit %s",
-				commitID.String(),
-			),
-		)
-	}
-
-	return commitFiles, nil
-}
-
-func getUpdatedFiles(
-	repo *git.Repository,
-	updatedRefs []githttp.UpdatedRef,
-) ([]UpdatedFile, error) {
-	var masterUpdatedRef *githttp.UpdatedRef
-	for _, updatedRef := range updatedRefs {
-		if updatedRef.Name != "refs/heads/master" {
-			continue
-		}
-		masterUpdatedRef = &updatedRef
-		break
-	}
-
-	if masterUpdatedRef == nil {
-		return nil, base.ErrorWithCategory(
-			gitserver.ErrInternalGit,
-			errors.New("failed to find the updated master ref"),
-		)
-	}
-
-	fromCommitID, err := git.NewOid(masterUpdatedRef.From)
-	if err != nil {
-		return nil, base.ErrorWithCategory(
-			gitserver.ErrInternalGit,
-			errors.Wrapf(
-				err,
-				"failed to parse the old OID '%s'",
-				masterUpdatedRef.From,
-			),
-		)
-	}
-
-	toCommitID, err := git.NewOid(masterUpdatedRef.To)
-	if err != nil {
-		return nil, base.ErrorWithCategory(
-			gitserver.ErrInternalGit,
-			errors.Wrapf(
-				err,
-				"failed to parse the new OID '%s'",
-				masterUpdatedRef.To,
-			),
-		)
-	}
-
-	fromIDs, err := getAllFilesForCommit(repo, fromCommitID)
-	if err != nil {
-		return nil, base.ErrorWithCategory(
-			gitserver.ErrInternalGit,
-			errors.Wrapf(
-				err,
-				"failed to get the old files for commit %s",
-				fromCommitID.String(),
-			),
-		)
-	}
-	toIDs, err := getAllFilesForCommit(repo, toCommitID)
-	if err != nil {
-		return nil, base.ErrorWithCategory(
-			gitserver.ErrInternalGit,
-			errors.Wrapf(
-				err,
-				"failed to get the new files for commit %s",
-				toCommitID.String(),
-			),
-		)
-	}
-
-	var updatedFiles []UpdatedFile
-	// Deleted files.
-	for filename := range fromIDs {
-		if _, ok := toIDs[filename]; !ok {
-			updatedFiles = append(updatedFiles, UpdatedFile{
-				Path: filename,
-				Type: "deleted",
-			})
-		}
-	}
-
-	// Added / modified files.
-	for filename, toID := range toIDs {
-		if fromID, ok := fromIDs[filename]; ok {
-			if !fromID.Equal(toID) {
-				updatedFiles = append(updatedFiles, UpdatedFile{
-					Path: filename,
-					Type: "modified",
-				})
-			}
-		} else {
-			updatedFiles = append(updatedFiles, UpdatedFile{
-				Path: filename,
-				Type: "added",
-			})
-		}
-	}
-
-	sort.Sort(byPath(updatedFiles))
-	return updatedFiles, nil
-}
-
 func commitZipFile(
-	zipPath string,
+	zipReader *zip.Reader,
 	repo *git.Repository,
 	lockfile *githttp.Lockfile,
 	authorUsername string,
 	commitMessage string,
 	problemSettings *common.ProblemSettings,
-	updateMask gitserver.ConvertZipUpdateMask,
+	zipMergeStrategy gitserver.ZipMergeStrategy,
 	acceptsSubmissions bool,
 	log log15.Logger,
-) (*UpdateResult, error) {
-	zipReader, err := zip.OpenReader(zipPath)
-	if err != nil {
-		log.Error("Failed to open the zip file", "err", err)
-		return nil, err
-	}
-	defer zipReader.Close()
-
-	oldOid := &git.Oid{}
-	var reference *git.Reference
-	if ok, _ := repo.IsHeadUnborn(); !ok {
-		reference, err = repo.Head()
-		if err != nil {
-			log.Error("Failed to get the repository's HEAD", "err", err)
-			return nil, err
-		}
-		defer reference.Free()
-		oldOid = reference.Target()
-	}
-
-	signature := git.Signature{
-		Name:  authorUsername,
-		Email: fmt.Sprintf("%s@omegaup", authorUsername),
-		When:  time.Now(),
-	}
-
-	packfile := bytes.NewBuffer([]byte{})
-	newOid, err := gitserver.ConvertZipToPackfile(
-		&zipReader.Reader,
-		problemSettings,
-		updateMask,
-		repo,
-		oldOid,
-		&signature,
-		&signature,
-		commitMessage,
-		acceptsSubmissions,
-		packfile,
-		log,
-	)
-	if err != nil {
-		return nil, err
-	}
-
+) (*gitserver.UpdateResult, error) {
 	ctx := request.NewContext(context.Background())
 	requestContext := request.FromContext(ctx)
 	requestContext.IsAdmin = true
@@ -294,39 +79,21 @@ func commitZipFile(
 		},
 		log,
 	)
-	updatedRefs, err, unpackErr := protocol.PushPackfile(
+
+	return gitserver.PushZip(
 		ctx,
+		zipReader,
+		githttp.AuthorizationAllowed,
 		repo,
 		lockfile,
-		githttp.AuthorizationAllowed,
-		[]*githttp.GitCommand{
-			{
-				Old:           oldOid,
-				New:           newOid,
-				ReferenceName: "refs/heads/master",
-				Reference:     reference,
-			},
-		},
-		packfile,
+		authorUsername,
+		commitMessage,
+		problemSettings,
+		zipMergeStrategy,
+		acceptsSubmissions,
+		protocol,
+		log,
 	)
-	if err != nil {
-		log.Error("Failed to push .zip", "err", err)
-		return nil, err
-	}
-	if unpackErr != nil {
-		log.Error("Failed to unpack packfile", "err", unpackErr)
-		return nil, err
-	}
-
-	updatedFiles, err := getUpdatedFiles(repo, updatedRefs)
-	if err != nil {
-		log.Error("failed to get updated files", "err", err)
-	}
-	return &UpdateResult{
-		Status:       "ok",
-		UpdatedRefs:  updatedRefs,
-		UpdatedFiles: updatedFiles,
-	}, nil
 }
 
 func convertBlobsToPackfile(
@@ -486,7 +253,7 @@ func commitBlobs(
 	commitMessage string,
 	contents map[string]io.Reader,
 	log log15.Logger,
-) (*UpdateResult, error) {
+) (*gitserver.UpdateResult, error) {
 	reference, err := repo.Head()
 	if err != nil {
 		log.Error("Failed to get the repository's HEAD", "err", err)
@@ -556,141 +323,15 @@ func commitBlobs(
 		return nil, err
 	}
 
-	updatedFiles, err := getUpdatedFiles(repo, updatedRefs)
+	updatedFiles, err := gitserver.GetUpdatedFiles(repo, updatedRefs)
 	if err != nil {
 		log.Error("failed to get updated files", "err", err)
 	}
-	return &UpdateResult{
+	return &gitserver.UpdateResult{
 		Status:       "ok",
 		UpdatedRefs:  updatedRefs,
 		UpdatedFiles: updatedFiles,
 	}, nil
-}
-
-func commitSettings(
-	repo *git.Repository,
-	lockfile *githttp.Lockfile,
-	authorUsername string,
-	commitMessage string,
-	problemSettings *common.ProblemSettings,
-	log log15.Logger,
-) (*UpdateResult, error) {
-	reference, err := repo.Head()
-	if err != nil {
-		return nil, base.ErrorWithCategory(
-			gitserver.ErrInternalGit,
-			errors.Wrap(
-				err,
-				"failed to get the repository's HEAD",
-			),
-		)
-	}
-	defer reference.Free()
-
-	parentCommit, err := repo.LookupCommit(reference.Target())
-	if err != nil {
-		return nil, base.ErrorWithCategory(
-			gitserver.ErrInternalGit,
-			errors.Wrapf(
-				err,
-				"failed to find parent commit %s",
-				reference.Target().String(),
-			),
-		)
-	}
-	defer parentCommit.Free()
-
-	parentTree, err := parentCommit.Tree()
-	if err != nil {
-		return nil, base.ErrorWithCategory(
-			gitserver.ErrInternalGit,
-			errors.Wrapf(
-				err,
-				"failed to find tree for parent commit %s",
-				parentCommit,
-			),
-		)
-	}
-	defer parentTree.Free()
-
-	// settings.json
-	contents := make(map[string]io.Reader)
-	{
-		var updatedProblemSettings common.ProblemSettings
-		entry := parentTree.EntryByName("settings.json")
-		if entry == nil {
-			return nil, base.ErrorWithCategory(
-				gitserver.ErrInternalGit,
-				errors.New("failed to find settings.json"),
-			)
-		}
-		blob, err := repo.LookupBlob(entry.Id)
-		if err != nil {
-			return nil, base.ErrorWithCategory(
-				gitserver.ErrInternalGit,
-				errors.Wrap(
-					err,
-					"failed to lookup settings.json",
-				),
-			)
-		}
-		defer blob.Free()
-
-		if err := json.Unmarshal(blob.Contents(), &updatedProblemSettings); err != nil {
-			return nil, base.ErrorWithCategory(
-				gitserver.ErrJSONParseError,
-				errors.Wrap(
-					err,
-					"settings.json",
-				),
-			)
-		}
-
-		if updatedProblemSettings.Validator.Name != problemSettings.Validator.Name {
-			if updatedProblemSettings.Validator.Name == "custom" {
-				return nil, base.ErrorWithCategory(
-					gitserver.ErrProblemBadLayout,
-					errors.Errorf(
-						"problem with unused validator",
-					),
-				)
-			}
-			if problemSettings.Validator.Name == "custom" {
-				return nil, base.ErrorWithCategory(
-					gitserver.ErrProblemBadLayout,
-					errors.Errorf(
-						"problem with custom validator missing a validator",
-					),
-				)
-			}
-		}
-
-		updatedProblemSettings.Limits = problemSettings.Limits
-		updatedProblemSettings.Validator.Name = problemSettings.Validator.Name
-		updatedProblemSettings.Validator.Tolerance = problemSettings.Validator.Tolerance
-		updatedProblemSettings.Validator.Limits = problemSettings.Validator.Limits
-
-		problemSettingsBytes, err := json.MarshalIndent(&updatedProblemSettings, "", "  ")
-		if err != nil {
-			return nil, base.ErrorWithCategory(
-				gitserver.ErrProblemBadLayout,
-				errors.Wrap(
-					err,
-					"failed to marshal the new settings.json",
-				),
-			)
-		}
-		contents["settings.json"] = bytes.NewReader(problemSettingsBytes)
-	}
-
-	return commitBlobs(
-		repo,
-		lockfile,
-		authorUsername,
-		commitMessage,
-		contents,
-		log,
-	)
 }
 
 func main() {
@@ -737,7 +378,7 @@ func main() {
 		if _, err := os.Stat(path.Join(*repositoryPath, "omegaup/version")); os.IsNotExist(err) {
 			encoder := json.NewEncoder(os.Stdout)
 			encoder.SetIndent("", "\t")
-			encoder.Encode(&UpdateResult{
+			encoder.Encode(&gitserver.UpdateResult{
 				Status: "error",
 				Error:  "omegaup-update-problem-old-version",
 			})
@@ -771,37 +412,41 @@ func main() {
 		}
 	}
 
-	var updateResult *UpdateResult
+	var updateResult *gitserver.UpdateResult
 	if *zipPath != "" {
-		updateMask := gitserver.ConvertZipUpdateMask(0)
-		if *updateCases {
-			updateMask |= gitserver.ConvertZipUpdateNonStatements
-		}
-		if *updateStatements {
-			updateMask |= gitserver.ConvertZipUpdateStatements
+		zipMergeStrategy, err := gitserver.ParseZipMergeStrategy(*mergeStrategyName)
+		if err != nil {
+			log.Crit("Invalid value for -merge-strategy: %q", *mergeStrategyName)
+			os.Exit(1)
 		}
 
-		var err error
+		zipReader, err := zip.OpenReader(*zipPath)
+		if err != nil {
+			log.Crit("Failed to open the zip file", "err", err)
+			os.Exit(1)
+		}
+		defer zipReader.Close()
+
 		updateResult, err = commitZipFile(
-			*zipPath,
+			&zipReader.Reader,
 			repo,
 			lockfile,
 			*author,
 			*commitMessage,
 			problemSettings,
-			updateMask,
+			zipMergeStrategy,
 			*acceptsSubmissions,
 			log,
 		)
 		if err != nil {
 			log.Error("Failed update the repository", "path", *repositoryPath, "err", err)
-			updateResult = &UpdateResult{
+			updateResult = &gitserver.UpdateResult{
 				Status: "error",
 				Error:  err.Error(),
 			}
 		} else if err := commitCallback(); err != nil {
 			log.Error("Failed to commit the write to the repository", "err", err)
-			updateResult = &UpdateResult{
+			updateResult = &gitserver.UpdateResult{
 				Status: "error",
 				Error:  err.Error(),
 			}
@@ -838,24 +483,33 @@ func main() {
 		)
 		if err != nil {
 			log.Error("Failed update the repository", "path", *repositoryPath, "err", err)
-			updateResult = &UpdateResult{
+			updateResult = &gitserver.UpdateResult{
 				Status: "error",
 				Error:  err.Error(),
 			}
 		}
 	} else if *problemSettingsJSON != "" {
 		var err error
-		updateResult, err = commitSettings(
+		zipReader, err := zip.NewReader(bytes.NewReader(emptyZipFile), int64(len(emptyZipFile)))
+		if err != nil {
+			log.Crit("Failed to open the empty zip file", "err", err)
+			os.Exit(1)
+		}
+
+		updateResult, err = commitZipFile(
+			zipReader,
 			repo,
 			lockfile,
 			*author,
 			*commitMessage,
 			problemSettings,
+			gitserver.ZipMergeStrategyOurs,
+			*acceptsSubmissions,
 			log,
 		)
 		if err != nil {
 			log.Error("Failed update the repository", "path", *repositoryPath, "err", err)
-			updateResult = &UpdateResult{
+			updateResult = &gitserver.UpdateResult{
 				Status: "error",
 				Error:  err.Error(),
 			}
