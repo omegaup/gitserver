@@ -24,6 +24,7 @@ import (
 var (
 	rootPath                = flag.String("root", "", "Root path of all repositories")
 	publicKeyBase64         = flag.String("public-key", "gKEg5JlIOA1BsIxETZYhjd+ZGchY/rZeQM0GheAWvXw=", "Public key of the omegaUp frontend")
+	secretToken             = flag.String("secret-token", "", "A secret token to use instead of resorting to PKI for speeding up tests")
 	port                    = flag.Int("port", 33861, "Port in which the server will listen")
 	pprofPort               = flag.Int("pprof-port", 33862, "Port in which the pprof server will listen")
 	libinteractivePath      = flag.String("libinteractive-path", "/usr/share/java/libinteractive.jar", "Path of libinteractive.jar")
@@ -95,6 +96,57 @@ func (a *bearerAuthorization) authorize(
 	return githttp.AuthorizationAllowed, username
 }
 
+type secretTokenAuthorization struct {
+	log         log15.Logger
+	secretToken string
+}
+
+func (a *secretTokenAuthorization) parseSecretTokenAuth(auth string) (username string, ok bool) {
+	tokens := strings.SplitN(auth, " ", 3)
+	if len(tokens) != 3 {
+		return
+	}
+
+	if !strings.EqualFold(tokens[0], "Bearer") {
+		return
+	}
+	if tokens[1] != a.secretToken {
+		return
+	}
+
+	username = tokens[2]
+	ok = true
+	return
+}
+
+func (a *secretTokenAuthorization) authorize(
+	ctx context.Context,
+	w http.ResponseWriter,
+	r *http.Request,
+	repositoryName string,
+	operation githttp.GitOperation,
+) (githttp.AuthorizationLevel, string) {
+	username, ok := a.parseSecretTokenAuth(r.Header.Get("Authorization"))
+	if !ok {
+		w.Header().Set("WWW-Authenticate", "Bearer realm=\"omegaUp gitserver\"")
+		w.WriteHeader(http.StatusUnauthorized)
+		return githttp.AuthorizationDenied, ""
+	}
+
+	log.Info(
+		"Auth",
+		"username", username,
+		"repository", repositoryName,
+		"operation", operation,
+	)
+	requestContext := request.FromContext(ctx)
+	// Right now only the frontend can issue requests, so we trust it completely.
+	requestContext.CanView = true
+	requestContext.IsAdmin = true
+	requestContext.CanEdit = true
+	return githttp.AuthorizationAllowed, username
+}
+
 func referenceDiscovery(
 	ctx context.Context,
 	repository *git.Repository,
@@ -152,19 +204,30 @@ func main() {
 	stopChan := make(chan os.Signal)
 	signal.Notify(stopChan, os.Interrupt)
 
-	keyBytes, err := base64.StdEncoding.DecodeString(*publicKeyBase64)
-	if err != nil {
-		log.Error("failed to parse the base64-encoded public key", "err", err)
-		os.Exit(1)
-	}
+	var authCallback githttp.AuthorizationCallback
+	if *publicKeyBase64 == "" && *secretToken != "" {
+		log.Warn("using insecure secret token authorization")
+		auth := secretTokenAuthorization{
+			log:         log,
+			secretToken: *secretToken,
+		}
+		authCallback = auth.authorize
+	} else {
+		keyBytes, err := base64.StdEncoding.DecodeString(*publicKeyBase64)
+		if err != nil {
+			log.Error("failed to parse the base64-encoded public key", "err", err)
+			os.Exit(1)
+		}
 
-	auth := bearerAuthorization{
-		log:       log,
-		publicKey: ed25519.PublicKey(keyBytes),
+		auth := bearerAuthorization{
+			log:       log,
+			publicKey: ed25519.PublicKey(keyBytes),
+		}
+		authCallback = auth.authorize
 	}
 
 	protocol := gitserver.NewGitProtocol(
-		auth.authorize,
+		authCallback,
 		referenceDiscovery,
 		*allowDirectPushToMaster,
 		gitserver.OverallWallTimeHardLimit,
