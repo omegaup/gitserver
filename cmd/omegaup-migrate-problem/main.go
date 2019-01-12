@@ -347,7 +347,12 @@ func convertCommitToPackfile(
 	}
 	if settings.Validator.Name == "custom" && !hasValidator {
 		log.Info("settings validator to 'token-caseless' for a single commit", "commit", commitID.String())
-		settings.Validator.Name = "token-caseless"
+		settingsCopy := *settings
+		settingsCopy.Validator.Name = "token-caseless"
+		if settingsCopy.Validator.Name == settings.Validator.Name {
+			log.Crit("something went wrong")
+		}
+		settings = &settingsCopy
 	}
 
 	return gitserver.CreatePackfile(
