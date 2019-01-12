@@ -1411,7 +1411,7 @@ func (h *zipUploadHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	create := r.URL.Query().Get("create") != ""
 
-	repositoryPath := path.Join(h.rootPath, fmt.Sprintf("%s.git", repositoryName))
+	repositoryPath := path.Join(h.rootPath, repositoryName)
 	h.log.Info(
 		"Request",
 		"Method", r.Method,

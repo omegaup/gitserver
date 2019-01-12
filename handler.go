@@ -1533,6 +1533,7 @@ func GitHandler(
 	return &gitHandler{
 		handler: githttp.GitServer(
 			rootPath,
+			"",
 			true,
 			protocol,
 			request.NewContext,

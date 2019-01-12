@@ -193,7 +193,7 @@ func TestConvertZip(t *testing.T) {
 
 	problemAlias := "sumas"
 
-	repo, err := InitRepository(path.Join(tmpDir, problemAlias+".git"))
+	repo, err := InitRepository(path.Join(tmpDir, problemAlias))
 	if err != nil {
 		t.Fatalf("Failed to initialize git repository: %v", err)
 	}

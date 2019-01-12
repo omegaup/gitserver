@@ -140,7 +140,7 @@ func createCommit(
 	commitMessage string,
 	log log15.Logger,
 ) (*git.Oid, []byte) {
-	repo, err := git.OpenRepository(path.Join(tmpDir, problemAlias+".git"))
+	repo, err := git.OpenRepository(path.Join(tmpDir, problemAlias))
 	if err != nil {
 		t.Fatalf("Failed to open repository: %v", err)
 	}
@@ -279,7 +279,7 @@ func TestInvalidRef(t *testing.T) {
 	problemAlias := "sumas"
 
 	{
-		repo, err := InitRepository(path.Join(tmpDir, problemAlias+".git"))
+		repo, err := InitRepository(path.Join(tmpDir, problemAlias))
 		if err != nil {
 			t.Fatalf("Failed to initialize git repository: %v", err)
 		}
@@ -350,7 +350,7 @@ func TestDelete(t *testing.T) {
 	problemAlias := "sumas"
 
 	{
-		repo, err := InitRepository(path.Join(tmpDir, problemAlias+".git"))
+		repo, err := InitRepository(path.Join(tmpDir, problemAlias))
 		if err != nil {
 			t.Fatalf("Failed to initialize git repository: %v", err)
 		}
@@ -424,7 +424,7 @@ func TestServerCreateReview(t *testing.T) {
 	problemAlias := "sumas"
 
 	{
-		repo, err := InitRepository(path.Join(tmpDir, problemAlias+".git"))
+		repo, err := InitRepository(path.Join(tmpDir, problemAlias))
 		if err != nil {
 			t.Fatalf("Failed to initialize git repository: %v", err)
 		}
@@ -1212,14 +1212,14 @@ func TestPushGitbomb(t *testing.T) {
 	problemAlias := "sumas"
 
 	{
-		repo, err := InitRepository(path.Join(tmpDir, problemAlias+".git"))
+		repo, err := InitRepository(path.Join(tmpDir, problemAlias))
 		if err != nil {
 			t.Fatalf("Failed to initialize git repository: %v", err)
 		}
 		repo.Free()
 	}
 
-	repo, err := git.OpenRepository(path.Join(tmpDir, problemAlias+".git"))
+	repo, err := git.OpenRepository(path.Join(tmpDir, problemAlias))
 	if err != nil {
 		t.Fatalf("Failed to open repository: %v", err)
 	}
@@ -1329,7 +1329,7 @@ func TestConfig(t *testing.T) {
 	problemAlias := "sumas"
 
 	{
-		repo, err := InitRepository(path.Join(tmpDir, problemAlias+".git"))
+		repo, err := InitRepository(path.Join(tmpDir, problemAlias))
 		if err != nil {
 			t.Fatalf("Failed to initialize git repository: %v", err)
 		}
@@ -1691,7 +1691,7 @@ func TestInteractive(t *testing.T) {
 
 	problemAlias := "sumas"
 
-	repo, err := InitRepository(path.Join(tmpDir, problemAlias+".git"))
+	repo, err := InitRepository(path.Join(tmpDir, problemAlias))
 	if err != nil {
 		t.Fatalf("Failed to initialize git repository: %v", err)
 	}
@@ -1842,7 +1842,7 @@ func TestExampleCases(t *testing.T) {
 
 	problemAlias := "sumas"
 
-	repo, err := InitRepository(path.Join(tmpDir, problemAlias+".git"))
+	repo, err := InitRepository(path.Join(tmpDir, problemAlias))
 	if err != nil {
 		t.Fatalf("Failed to initialize git repository: %v", err)
 	}
