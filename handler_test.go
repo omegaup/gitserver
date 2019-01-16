@@ -166,7 +166,6 @@ func createCommit(
 	if err != nil {
 		t.Fatalf("Failed to create mempack: %v", err)
 	}
-	defer mempack.Free()
 
 	tree, err := githttp.BuildTree(repo, contents, log)
 	if err != nil {
@@ -1235,7 +1234,6 @@ func TestPushGitbomb(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create mempack: %v", err)
 	}
-	defer mempack.Free()
 
 	oid, err := repo.CreateBlobFromBuffer([]byte{})
 	if err != nil {
