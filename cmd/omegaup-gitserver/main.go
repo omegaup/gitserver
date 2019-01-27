@@ -31,7 +31,11 @@ var (
 	allowDirectPushToMaster = flag.Bool("allow-direct-push-to-master", false, "Allow direct push to master")
 	logFile                 = flag.String("log-file", "", "Redirect logs to file")
 	verbose                 = flag.Bool("verbose", false, "Verbose logging")
+	version                 = flag.Bool("version", false, "Print the version and exit")
 	log                     log15.Logger
+
+	// ProgramVersion is the version of the code from which the binary was built from.
+	ProgramVersion string
 )
 
 type bearerAuthorization struct {
@@ -195,6 +199,12 @@ func (h *muxGitHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 func main() {
 	flag.Parse()
+
+	if *version {
+		fmt.Printf("omegaup-gitserver %s\n", ProgramVersion)
+		return
+	}
+
 	if *logFile != "" {
 		logLevel := "info"
 		if *verbose {

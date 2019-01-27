@@ -1404,7 +1404,7 @@ func (h *zipUploadHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		h.log.Error("invalid merge strategy", "mergeStrategy", paramValue("mergeStrategy"))
 		w.WriteHeader(http.StatusBadRequest)
-		os.Exit(1)
+		return
 	}
 
 	ctx := request.NewContext(r.Context())
