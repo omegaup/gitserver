@@ -1469,12 +1469,30 @@ func (h *zipUploadHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var repo *git.Repository
+	commitCallback := func() error { return nil }
 	if create {
-		repo, err = InitRepository(repositoryPath)
+		dir, err := ioutil.TempDir(filepath.Dir(repositoryPath), "repository")
+		if err != nil {
+			h.log.Error("Failed to create temporary directory", "err", err)
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+		defer os.RemoveAll(dir)
+
+		if err := os.Chmod(dir, 0755); err != nil {
+			h.log.Error("Failed to chmod temporary directory", "err", err)
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+
+		repo, err = InitRepository(dir)
 		if err != nil {
 			h.log.Error("failed to init repository", "err", err)
 			w.WriteHeader(http.StatusInternalServerError)
 			return
+		}
+		commitCallback = func() error {
+			return os.Rename(dir, repositoryPath)
 		}
 	} else {
 		repo, err = git.OpenRepository(repositoryPath)
@@ -1520,6 +1538,11 @@ func (h *zipUploadHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			Error:  cause.Error(),
 		}
 	} else {
+		if err := commitCallback(); err != nil {
+			h.log.Info("push successful, but commit failed", "path", repositoryPath, "result", updateResult, "err", err)
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
 		h.log.Info("push successful", "path", repositoryPath, "result", updateResult)
 		w.WriteHeader(http.StatusOK)
 	}
