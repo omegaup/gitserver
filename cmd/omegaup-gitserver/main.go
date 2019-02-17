@@ -18,6 +18,7 @@ import (
 	"os"
 	"os/signal"
 	"strings"
+	"syscall"
 	"time"
 )
 
@@ -222,7 +223,7 @@ func main() {
 	}
 
 	stopChan := make(chan os.Signal)
-	signal.Notify(stopChan, os.Interrupt)
+	signal.Notify(stopChan, syscall.SIGINT, syscall.SIGTERM)
 
 	var authCallback githttp.AuthorizationCallback
 	if *publicKeyBase64 == "" && *secretToken != "" {
