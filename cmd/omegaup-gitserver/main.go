@@ -199,6 +199,8 @@ func (h *muxGitHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 func main() {
+	defer git.Shutdown()
+
 	flag.Parse()
 
 	if *version {
