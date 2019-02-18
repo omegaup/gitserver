@@ -5,6 +5,7 @@ import (
 	"encoding/base64"
 	"flag"
 	"fmt"
+	"github.com/coreos/go-systemd/daemon"
 	"github.com/inconshreveable/log15"
 	git "github.com/lhchavez/git2go"
 	"github.com/o1egl/paseto"
@@ -296,6 +297,7 @@ func main() {
 		}()
 		log.Info(fmt.Sprintf("pprof server ready for connections at http://localhost:%d", *pprofPort))
 	}
+	daemon.SdNotify(false, "READY=1")
 
 	<-stopChan
 
