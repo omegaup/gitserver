@@ -178,12 +178,12 @@ func createCommit(
 		&git.Signature{
 			Name:  "author",
 			Email: "author@test.test",
-			When:  time.Unix(0, 0),
+			When:  time.Unix(0, 0).In(time.UTC),
 		},
 		&git.Signature{
 			Name:  "committer",
 			Email: "committer@test.test",
-			When:  time.Unix(0, 0),
+			When:  time.Unix(0, 0).In(time.UTC),
 		},
 		commitMessage,
 		tree,
@@ -1273,12 +1273,12 @@ func TestPushGitbomb(t *testing.T) {
 		&git.Signature{
 			Name:  "author",
 			Email: "author@test.test",
-			When:  time.Unix(0, 0),
+			When:  time.Unix(0, 0).In(time.UTC),
 		},
 		&git.Signature{
 			Name:  "committer",
 			Email: "committer@test.test",
-			When:  time.Unix(0, 0),
+			When:  time.Unix(0, 0).In(time.UTC),
 		},
 		"Initial commit",
 		tree,
