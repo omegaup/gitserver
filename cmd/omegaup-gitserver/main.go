@@ -19,6 +19,7 @@ import (
 	"os"
 	"os/signal"
 	"strings"
+	"sync"
 	"syscall"
 	"time"
 )
@@ -267,18 +268,22 @@ func main() {
 		os.Exit(1)
 	}
 
+	var servers []*http.Server
+	var wg sync.WaitGroup
 	gitServer := &http.Server{
 		Addr:    fmt.Sprintf(":%d", *port),
 		Handler: muxHandler(*rootPath, protocol, log),
 	}
+	servers = append(servers, gitServer)
+	wg.Add(1)
 	go func() {
-		if err := gitServer.ListenAndServe(); err != nil {
+		defer wg.Done()
+		if err := gitServer.ListenAndServe(); err != http.ErrServerClosed {
 			log.Error("gitServer ListenAndServe", "err", err)
 		}
 	}()
 	log.Info(fmt.Sprintf("git server ready for connections at http://localhost:%d", *port))
 
-	var pprofServer *http.Server
 	if *pprofPort > 0 {
 		pprofServeMux := http.NewServeMux()
 		pprofServeMux.HandleFunc("/debug/pprof/", pprof.Index)
@@ -290,8 +295,11 @@ func main() {
 			Addr:    fmt.Sprintf("localhost:%d", *pprofPort),
 			Handler: pprofServeMux,
 		}
+		servers = append(servers, pprofServer)
+		wg.Add(1)
 		go func() {
-			if err := pprofServer.ListenAndServe(); err != nil {
+			defer wg.Done()
+			if err := pprofServer.ListenAndServe(); err != http.ErrServerClosed {
 				log.Error("pprof ListenAndServe", "err", err)
 			}
 		}()
@@ -303,11 +311,12 @@ func main() {
 
 	log.Info("Shutting down server...")
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-	gitServer.Shutdown(ctx)
-	if pprofServer != nil {
-		pprofServer.Shutdown(ctx)
+	for _, server := range servers {
+		server.Shutdown(ctx)
 	}
+
+	cancel()
+	wg.Wait()
 
 	log.Info("Server gracefully stopped.")
 }
