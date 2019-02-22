@@ -316,11 +316,11 @@ func TestUpdateProblemSettings(t *testing.T) {
 		}
 		problemSettings := &common.ProblemSettings{
 			Limits: common.LimitsSettings{
-				ExtraWallTime:        common.Duration(0),
+				ExtraWallTime:        base.Duration(0),
 				MemoryLimit:          33554432,
 				OutputLimit:          10240,
-				OverallWallTimeLimit: common.Duration(5 * time.Minute),
-				TimeLimit:            common.Duration(time.Second),
+				OverallWallTimeLimit: base.Duration(5 * time.Minute),
+				TimeLimit:            base.Duration(time.Second),
 			},
 			Slow: false,
 			Validator: common.ValidatorSettings{

@@ -91,11 +91,11 @@ func getBaseProblemSettings(problemAlias string) (*common.ProblemSettings, bool,
 		return nil, false, errors.Wrap(err, "failed to query database")
 	}
 
-	settings.Limits.MemoryLimit *= common.Kibibyte
-	settings.Limits.ExtraWallTime *= common.Duration(time.Millisecond)
-	settings.Limits.OverallWallTimeLimit *= common.Duration(time.Millisecond)
-	settings.Limits.TimeLimit *= common.Duration(time.Millisecond)
-	validatorLimits.TimeLimit *= common.Duration(time.Millisecond)
+	settings.Limits.MemoryLimit *= base.Kibibyte
+	settings.Limits.ExtraWallTime *= base.Duration(time.Millisecond)
+	settings.Limits.OverallWallTimeLimit *= base.Duration(time.Millisecond)
+	settings.Limits.TimeLimit *= base.Duration(time.Millisecond)
+	validatorLimits.TimeLimit *= base.Duration(time.Millisecond)
 
 	if settings.Validator.Name == "custom" {
 		if validatorLimits.ExtraWallTime < settings.Limits.ExtraWallTime {
@@ -462,7 +462,7 @@ func migrateProblem(
 		nil,
 		true,
 		// Legacy problems have high limits.
-		common.Duration(time.Duration(5)*time.Minute),
+		base.Duration(time.Duration(5)*time.Minute),
 		&gitserver.LibinteractiveCompiler{
 			LibinteractiveJarPath: *libinteractivePath,
 			Log:                   log,

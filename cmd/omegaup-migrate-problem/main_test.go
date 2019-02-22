@@ -14,10 +14,10 @@ import (
 var (
 	defaultSettings = common.ProblemSettings{
 		Limits: common.LimitsSettings{
-			MemoryLimit:          common.Byte(64) * common.Mebibyte,
-			OutputLimit:          common.Byte(16) * common.Kibibyte,
-			OverallWallTimeLimit: common.Duration(time.Duration(1) * time.Minute),
-			TimeLimit:            common.Duration(time.Duration(3) * time.Second),
+			MemoryLimit:          base.Byte(64) * base.Mebibyte,
+			OutputLimit:          base.Byte(16) * base.Kibibyte,
+			OverallWallTimeLimit: base.Duration(time.Duration(1) * time.Minute),
+			TimeLimit:            base.Duration(time.Duration(3) * time.Second),
 		},
 		Slow: false,
 		Validator: common.ValidatorSettings{

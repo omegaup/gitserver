@@ -29,12 +29,12 @@ import (
 )
 
 const (
-	maxAllowedZipSize          = 200 * common.Mebibyte
-	slowQueueThresholdDuration = common.Duration(time.Duration(30) * time.Second)
+	maxAllowedZipSize          = 200 * base.Mebibyte
+	slowQueueThresholdDuration = base.Duration(time.Duration(30) * time.Second)
 
 	// OverallWallTimeHardLimit is the absolute maximum wall time that problems
 	// are allowed to have.
-	OverallWallTimeHardLimit = common.Duration(time.Duration(60) * time.Second)
+	OverallWallTimeHardLimit = base.Duration(time.Duration(60) * time.Second)
 )
 
 // A ZipMergeStrategy represents the strategy to use when merging the trees of
@@ -1350,7 +1350,7 @@ func (h *zipUploadHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	var requestZip io.ReadCloser
 	var paramValue func(string) string
 	if strings.HasPrefix(r.Header.Get("Content-Type"), "multipart/form-data") {
-		if err := r.ParseMultipartForm((32 * common.Mebibyte).Bytes()); err != nil {
+		if err := r.ParseMultipartForm((32 * base.Mebibyte).Bytes()); err != nil {
 			h.log.Error("Unable to parse multipart form", "err", err)
 			w.WriteHeader(http.StatusBadRequest)
 			return

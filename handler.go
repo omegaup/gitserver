@@ -191,7 +191,7 @@ type Config struct {
 
 type gitProtocol struct {
 	allowDirectPushToMaster     bool
-	hardOverallWallTimeLimit    common.Duration
+	hardOverallWallTimeLimit    base.Duration
 	interactiveSettingsCompiler InteractiveSettingsCompiler
 	log                         log15.Logger
 }
@@ -202,7 +202,7 @@ func NewGitProtocol(
 	authCallback githttp.AuthorizationCallback,
 	referenceDiscoveryCallback githttp.ReferenceDiscoveryCallback,
 	allowDirectPushToMaster bool,
-	hardOverallWallTimeLimit common.Duration,
+	hardOverallWallTimeLimit base.Duration,
 	interactiveSettingsCompiler InteractiveSettingsCompiler,
 	log log15.Logger,
 ) *githttp.GitProtocol {
@@ -256,7 +256,7 @@ func getProblemSettings(repo *git.Repository, tree *git.Tree) (*common.ProblemSe
 
 func isSlow(
 	settings *common.ProblemSettings,
-	hardOverallWallTimeLimit common.Duration,
+	hardOverallWallTimeLimit base.Duration,
 ) (bool, error) {
 	if settings.Limits.OverallWallTimeLimit <= slowQueueThresholdDuration {
 		return false, nil
@@ -272,7 +272,7 @@ func isSlow(
 		maxRunDuration += settings.Validator.Limits.TimeLimit + settings.Validator.Limits.ExtraWallTime
 	}
 
-	maxRuntime := common.Duration(
+	maxRuntime := base.Duration(
 		time.Duration(math.Ceil(maxRunDuration.Seconds())*float64(inputCount)) * time.Second,
 	)
 	if settings.Limits.OverallWallTimeLimit > hardOverallWallTimeLimit &&
@@ -493,7 +493,7 @@ func validateUpdateMaster(
 	repository *git.Repository,
 	newCommit *git.Commit,
 	allowDirectPush bool,
-	hardOverallWallTimeLimit common.Duration,
+	hardOverallWallTimeLimit base.Duration,
 	interactiveSettingsCompiler InteractiveSettingsCompiler,
 	log log15.Logger,
 ) error {
