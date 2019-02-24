@@ -452,7 +452,7 @@ func migrateProblem(
 	}
 	log.Info("commit log", "log", commitLog)
 
-	ctx := request.NewContext(context.Background())
+	ctx := request.NewContext(context.Background(), &base.NoOpMetrics{})
 	requestContext := request.FromContext(ctx)
 	requestContext.IsAdmin = true
 	requestContext.CanView = true

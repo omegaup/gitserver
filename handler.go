@@ -1528,6 +1528,7 @@ func (g *gitHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 func GitHandler(
 	rootPath string,
 	protocol *githttp.GitProtocol,
+	metrics base.Metrics,
 	log log15.Logger,
 ) http.Handler {
 	return &gitHandler{
@@ -1536,7 +1537,9 @@ func GitHandler(
 			"",
 			true,
 			protocol,
-			request.NewContext,
+			func(ctx context.Context) context.Context {
+				return request.NewContext(ctx, metrics)
+			},
 			log,
 		),
 		log: log,

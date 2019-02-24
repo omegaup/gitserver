@@ -2,6 +2,7 @@ package request
 
 import (
 	"context"
+	base "github.com/omegaup/go-base"
 	"io"
 )
 
@@ -17,13 +18,18 @@ type Context struct {
 	HasSolved    bool
 	ReviewRef    string
 	UpdatedFiles map[string]io.Reader
+	Metrics      base.Metrics
 }
 
 // NewContext wraps the supplied context and associates a git
 // protocol-specific context value to it.
-func NewContext(ctx context.Context) context.Context {
+func NewContext(ctx context.Context, metrics base.Metrics) context.Context {
+	if metrics == nil {
+		metrics = &base.NoOpMetrics{}
+	}
 	return context.WithValue(ctx, requestContextKey, &Context{
 		UpdatedFiles: make(map[string]io.Reader),
+		Metrics:      metrics,
 	})
 }
 

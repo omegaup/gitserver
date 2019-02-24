@@ -1324,6 +1324,7 @@ func PushZip(
 type zipUploadHandler struct {
 	rootPath string
 	protocol *githttp.GitProtocol
+	metrics  base.Metrics
 	log      log15.Logger
 }
 
@@ -1407,7 +1408,7 @@ func (h *zipUploadHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	ctx := request.NewContext(r.Context())
+	ctx := request.NewContext(r.Context(), h.metrics)
 
 	create := r.URL.Query().Get("create") != ""
 
@@ -1556,11 +1557,13 @@ func (h *zipUploadHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 func ZipHandler(
 	rootPath string,
 	protocol *githttp.GitProtocol,
+	metrics base.Metrics,
 	log log15.Logger,
 ) http.Handler {
 	return &zipUploadHandler{
 		rootPath: rootPath,
 		protocol: protocol,
+		metrics:  metrics,
 		log:      log,
 	}
 }

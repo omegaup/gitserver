@@ -174,9 +174,10 @@ func referenceDiscovery(
 }
 
 type muxGitHandler struct {
-	log        log15.Logger
-	gitHandler http.Handler
-	zipHandler http.Handler
+	log            log15.Logger
+	gitHandler     http.Handler
+	zipHandler     http.Handler
+	metricsHandler http.Handler
 }
 
 func muxHandler(
@@ -184,16 +185,20 @@ func muxHandler(
 	protocol *githttp.GitProtocol,
 	log log15.Logger,
 ) http.Handler {
+	metrics, metricsHandler := gitserver.SetupMetrics()
 	return &muxGitHandler{
-		log:        log,
-		gitHandler: gitserver.GitHandler(rootPath, protocol, log),
-		zipHandler: gitserver.ZipHandler(rootPath, protocol, log),
+		log:            log,
+		gitHandler:     gitserver.GitHandler(rootPath, protocol, metrics, log),
+		zipHandler:     gitserver.ZipHandler(rootPath, protocol, metrics, log),
+		metricsHandler: metricsHandler,
 	}
 }
 
 func (h *muxGitHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	splitPath := strings.SplitN(r.URL.Path[1:], "/", 2)
-	if len(splitPath) == 2 && splitPath[1] == "git-upload-zip" {
+	if len(splitPath) > 1 && splitPath[0] == "metrics" {
+		h.metricsHandler.ServeHTTP(w, r)
+	} else if len(splitPath) == 2 && splitPath[1] == "git-upload-zip" {
 		h.zipHandler.ServeHTTP(w, r)
 	} else {
 		h.gitHandler.ServeHTTP(w, r)

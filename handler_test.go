@@ -271,6 +271,7 @@ func TestInvalidRef(t *testing.T) {
 	ts := httptest.NewServer(GitHandler(
 		tmpDir,
 		NewGitProtocol(authorize, nil, false, OverallWallTimeHardLimit, fakeInteractiveSettingsCompiler, log),
+		&base.NoOpMetrics{},
 		log,
 	))
 	defer ts.Close()
@@ -342,6 +343,7 @@ func TestDelete(t *testing.T) {
 	ts := httptest.NewServer(GitHandler(
 		tmpDir,
 		NewGitProtocol(authorize, nil, false, OverallWallTimeHardLimit, fakeInteractiveSettingsCompiler, log),
+		&base.NoOpMetrics{},
 		log,
 	))
 	defer ts.Close()
@@ -416,6 +418,7 @@ func TestServerCreateReview(t *testing.T) {
 	ts := httptest.NewServer(GitHandler(
 		tmpDir,
 		NewGitProtocol(authorize, nil, false, OverallWallTimeHardLimit, fakeInteractiveSettingsCompiler, log),
+		&base.NoOpMetrics{},
 		log,
 	))
 	defer ts.Close()
@@ -1204,6 +1207,7 @@ func TestPushGitbomb(t *testing.T) {
 	ts := httptest.NewServer(GitHandler(
 		tmpDir,
 		NewGitProtocol(authorize, nil, false, OverallWallTimeHardLimit, fakeInteractiveSettingsCompiler, log),
+		&base.NoOpMetrics{},
 		log,
 	))
 	defer ts.Close()
@@ -1320,6 +1324,7 @@ func TestConfig(t *testing.T) {
 	ts := httptest.NewServer(GitHandler(
 		tmpDir,
 		NewGitProtocol(authorize, nil, false, OverallWallTimeHardLimit, fakeInteractiveSettingsCompiler, log),
+		&base.NoOpMetrics{},
 		log,
 	))
 	defer ts.Close()
@@ -1683,6 +1688,7 @@ func TestInteractive(t *testing.T) {
 			},
 			log,
 		),
+		&base.NoOpMetrics{},
 		log,
 	))
 	defer ts.Close()
@@ -1834,6 +1840,7 @@ func TestExampleCases(t *testing.T) {
 	ts := httptest.NewServer(GitHandler(
 		tmpDir,
 		NewGitProtocol(authorize, nil, true, OverallWallTimeHardLimit, fakeInteractiveSettingsCompiler, log),
+		&base.NoOpMetrics{},
 		log,
 	))
 	defer ts.Close()

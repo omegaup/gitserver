@@ -62,7 +62,7 @@ func commitZipFile(
 	acceptsSubmissions bool,
 	log log15.Logger,
 ) (*gitserver.UpdateResult, error) {
-	ctx := request.NewContext(context.Background())
+	ctx := request.NewContext(context.Background(), &base.NoOpMetrics{})
 	requestContext := request.FromContext(ctx)
 	requestContext.IsAdmin = true
 	requestContext.CanView = true
@@ -283,7 +283,7 @@ func commitBlobs(
 		return nil, err
 	}
 
-	ctx := request.NewContext(context.Background())
+	ctx := request.NewContext(context.Background(), &base.NoOpMetrics{})
 	requestContext := request.FromContext(ctx)
 	requestContext.IsAdmin = true
 	requestContext.CanView = true

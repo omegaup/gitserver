@@ -123,6 +123,7 @@ func TestPushZip(t *testing.T) {
 	ts := httptest.NewServer(ZipHandler(
 		tmpDir,
 		NewGitProtocol(authorize, nil, true, OverallWallTimeHardLimit, fakeInteractiveSettingsCompiler, log),
+		&base.NoOpMetrics{},
 		log,
 	))
 	defer ts.Close()
@@ -275,6 +276,7 @@ func TestUpdateProblemSettings(t *testing.T) {
 	ts := httptest.NewServer(ZipHandler(
 		tmpDir,
 		NewGitProtocol(authorize, nil, true, OverallWallTimeHardLimit, fakeInteractiveSettingsCompiler, log),
+		&base.NoOpMetrics{},
 		log,
 	))
 	defer ts.Close()
