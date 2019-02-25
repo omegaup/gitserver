@@ -196,7 +196,7 @@ func muxHandler(
 
 func (h *muxGitHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	splitPath := strings.SplitN(r.URL.Path[1:], "/", 2)
-	if len(splitPath) > 1 && splitPath[0] == "metrics" {
+	if len(splitPath) >= 1 && splitPath[0] == "metrics" {
 		h.metricsHandler.ServeHTTP(w, r)
 	} else if len(splitPath) == 2 && splitPath[1] == "git-upload-zip" {
 		h.zipHandler.ServeHTTP(w, r)

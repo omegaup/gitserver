@@ -11,15 +11,7 @@ var (
 
 	counters = map[string]prometheus.Counter{}
 
-	summaries = map[string]prometheus.Summary{
-		"grader_queue_delay_seconds": prometheus.NewSummary(prometheus.SummaryOpts{
-			Namespace:  "quark",
-			Subsystem:  "grader",
-			Help:       "The duration of a run in any queue",
-			Name:       "queue_delay_seconds",
-			Objectives: map[float64]float64{0.5: 0.05, 0.9: 0.01, 0.99: 0.001},
-		}),
-	}
+	summaries = map[string]prometheus.Summary{}
 )
 
 type prometheusMetrics struct {
