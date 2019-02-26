@@ -1817,7 +1817,7 @@ int main(int argc, char* argv[]) {
 	}
 	if !reflect.DeepEqual(expectedExampleCases, problemDistribSettings.Cases) {
 		t.Errorf(
-			"Mismatched example cases. expected %q, got %q",
+			"Mismatched example cases. expected %v, got %v",
 			expectedExampleCases,
 			problemDistribSettings.Cases,
 		)
@@ -1910,7 +1910,7 @@ func TestExampleCases(t *testing.T) {
 		expectedExampleCases := map[string]*common.LiteralCaseSettings{}
 		if !reflect.DeepEqual(expectedExampleCases, problemDistribSettings.Cases) {
 			t.Errorf(
-				"Mismatched example cases. expected %q, got %q",
+				"Mismatched example cases. expected %v, got %v",
 				expectedExampleCases,
 				problemDistribSettings.Cases,
 			)
@@ -1996,7 +1996,7 @@ func TestExampleCases(t *testing.T) {
 		}
 		if !reflect.DeepEqual(expectedExampleCases, problemDistribSettings.Cases) {
 			t.Errorf(
-				"Mismatched example cases. expected %q, got %q",
+				"Mismatched example cases. expected %v, got %v",
 				expectedExampleCases,
 				problemDistribSettings.Cases,
 			)
@@ -2079,7 +2079,7 @@ func TestExampleCases(t *testing.T) {
 		}
 		if !reflect.DeepEqual(expectedExampleCases, problemDistribSettings.Cases) {
 			t.Errorf(
-				"Mismatched example cases. expected %q, got %q",
+				"Mismatched example cases. expected %v, got %v",
 				expectedExampleCases,
 				problemDistribSettings.Cases,
 			)
@@ -2143,7 +2143,7 @@ missing the end thingy`,
 		actualOutput := extractExampleCasesFromStatement(testCase.statement)
 		if !reflect.DeepEqual(testCase.expectedOutput, actualOutput) {
 			t.Errorf(
-				"Failed to extract examples from %v. expected %q, got %q",
+				"Failed to extract examples from %v. expected %v, got %v",
 				testCase.statement,
 				testCase.expectedOutput,
 				actualOutput,

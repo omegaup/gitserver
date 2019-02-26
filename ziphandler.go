@@ -980,7 +980,7 @@ func getUpdatedProblemSettings(
 			errors.Wrapf(
 				err,
 				"failed to find tree for parent commit %s",
-				parentCommit,
+				parentCommit.Id(),
 			),
 		)
 	}
