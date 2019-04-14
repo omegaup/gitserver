@@ -171,7 +171,6 @@ func convertBlobsToPackfile(
 
 	mergedTree, err := githttp.MergeTrees(
 		repo,
-		log,
 		tree,
 		headTree,
 	)

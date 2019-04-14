@@ -838,7 +838,6 @@ func CreatePackfile(
 
 		mergedTree, err := githttp.MergeTrees(
 			repo,
-			log,
 			tree,
 			parentTree,
 		)
