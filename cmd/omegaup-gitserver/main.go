@@ -287,7 +287,11 @@ func main() {
 			log.Error("gitServer ListenAndServe", "err", err)
 		}
 	}()
-	log.Info(fmt.Sprintf("git server ready for connections at http://localhost:%d", *port))
+	log.Info(
+		"omegaUp gitserver ready",
+		"version", ProgramVersion,
+		"address", gitServer.Addr,
+	)
 
 	if *pprofPort > 0 {
 		pprofServeMux := http.NewServeMux()
@@ -308,12 +312,16 @@ func main() {
 				log.Error("pprof ListenAndServe", "err", err)
 			}
 		}()
-		log.Info(fmt.Sprintf("pprof server ready for connections at http://localhost:%d", *pprofPort))
+		log.Info(
+			"pprof server ready",
+			"address", pprofServer.Addr,
+		)
 	}
 	daemon.SdNotify(false, "READY=1")
 
 	<-stopChan
 
+	daemon.SdNotify(false, "STOPPING=1")
 	log.Info("Shutting down server...")
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	for _, server := range servers {
