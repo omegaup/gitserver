@@ -1313,6 +1313,49 @@ func PushZip(
 			"failed to get list of updated files",
 		)
 	}
+
+	// Update the published ref.
+	publishedUpdatedRef := githttp.UpdatedRef{
+		Name: "refs/heads/published",
+	}
+	masterNewOid := &git.Oid{}
+	for _, ref := range updatedRefs {
+		if ref.Name == "refs/heads/master" {
+			publishedUpdatedRef.To = ref.To
+			publishedUpdatedRef.ToTree = ref.ToTree
+			masterNewOid, err = git.NewOid(ref.To)
+			if err != nil {
+				return nil, errors.Wrap(
+					err,
+					"failed to parse the updated ID",
+				)
+			}
+			break
+		}
+	}
+	if masterNewOid.IsZero() {
+		log.Error("could not find the updated reference for master")
+	} else {
+		if publishedBranch, err := repo.LookupBranch("published", git.BranchLocal); err == nil {
+			publishedUpdatedRef.From = publishedBranch.Target().String()
+			publishedBranch.Free()
+		}
+		if ref, err := repo.References.Create(
+			publishedUpdatedRef.Name,
+			masterNewOid,
+			true,
+			"",
+		); err != nil {
+			return nil, errors.Wrap(
+				err,
+				"failed to update the published ref",
+			)
+		} else {
+			ref.Free()
+		}
+		updatedRefs = append(updatedRefs, publishedUpdatedRef)
+	}
+
 	return &UpdateResult{
 		Status:       "ok",
 		UpdatedRefs:  updatedRefs,
