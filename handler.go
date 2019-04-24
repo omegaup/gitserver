@@ -217,6 +217,7 @@ func NewGitProtocol(
 		referenceDiscoveryCallback,
 		protocol.validateUpdate,
 		protocol.preprocess,
+		true,
 		log,
 	)
 }
@@ -1319,6 +1320,13 @@ func (p *gitProtocol) validateUpdate(
 	)
 	if command.IsDelete() {
 		return githttp.ErrDeleteDisallowed
+	}
+
+	// Since we allow non-fast-forward refs globally, we need to check if the
+	// published branch is the one being updated.
+	if command.ReferenceName != "refs/heads/published" &&
+		!githttp.ValidateFastForward(repository, newCommit, command.Reference) {
+		return githttp.ErrNonFastForward
 	}
 
 	// These are the only references that can be changed.
