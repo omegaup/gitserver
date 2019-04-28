@@ -1223,6 +1223,7 @@ func PushZip(
 	problemSettings *common.ProblemSettings,
 	zipMergeStrategy ZipMergeStrategy,
 	acceptsSubmissions bool,
+	updatePublished bool,
 	protocol *githttp.GitProtocol,
 	log log15.Logger,
 ) (*UpdateResult, error) {
@@ -1315,45 +1316,47 @@ func PushZip(
 	}
 
 	// Update the published ref.
-	publishedUpdatedRef := githttp.UpdatedRef{
-		Name: "refs/heads/published",
-	}
-	masterNewOid := &git.Oid{}
-	for _, ref := range updatedRefs {
-		if ref.Name == "refs/heads/master" {
-			publishedUpdatedRef.To = ref.To
-			publishedUpdatedRef.ToTree = ref.ToTree
-			masterNewOid, err = git.NewOid(ref.To)
-			if err != nil {
+	if updatePublished {
+		publishedUpdatedRef := githttp.UpdatedRef{
+			Name: "refs/heads/published",
+		}
+		masterNewOid := &git.Oid{}
+		for _, ref := range updatedRefs {
+			if ref.Name == "refs/heads/master" {
+				publishedUpdatedRef.To = ref.To
+				publishedUpdatedRef.ToTree = ref.ToTree
+				masterNewOid, err = git.NewOid(ref.To)
+				if err != nil {
+					return nil, errors.Wrap(
+						err,
+						"failed to parse the updated ID",
+					)
+				}
+				break
+			}
+		}
+		if masterNewOid.IsZero() {
+			log.Error("could not find the updated reference for master")
+		} else {
+			if publishedBranch, err := repo.LookupBranch("published", git.BranchLocal); err == nil {
+				publishedUpdatedRef.From = publishedBranch.Target().String()
+				publishedBranch.Free()
+			}
+			if ref, err := repo.References.Create(
+				publishedUpdatedRef.Name,
+				masterNewOid,
+				true,
+				"",
+			); err != nil {
 				return nil, errors.Wrap(
 					err,
-					"failed to parse the updated ID",
+					"failed to update the published ref",
 				)
+			} else {
+				ref.Free()
 			}
-			break
+			updatedRefs = append(updatedRefs, publishedUpdatedRef)
 		}
-	}
-	if masterNewOid.IsZero() {
-		log.Error("could not find the updated reference for master")
-	} else {
-		if publishedBranch, err := repo.LookupBranch("published", git.BranchLocal); err == nil {
-			publishedUpdatedRef.From = publishedBranch.Target().String()
-			publishedBranch.Free()
-		}
-		if ref, err := repo.References.Create(
-			publishedUpdatedRef.Name,
-			masterNewOid,
-			true,
-			"",
-		); err != nil {
-			return nil, errors.Wrap(
-				err,
-				"failed to update the published ref",
-			)
-		} else {
-			ref.Free()
-		}
-		updatedRefs = append(updatedRefs, publishedUpdatedRef)
 	}
 
 	return &UpdateResult{
@@ -1443,6 +1446,8 @@ func (h *zipUploadHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	acceptsSubmissions := (paramValue("acceptsSubmissions") == "" ||
 		paramValue("acceptsSubmissions") == "true")
+	updatePublished := (paramValue("updatePublished") == "" ||
+		paramValue("updatePublished") == "true")
 	zipMergeStrategy, err := ParseZipMergeStrategy(paramValue("mergeStrategy"))
 	if err != nil {
 		h.log.Error("invalid merge strategy", "mergeStrategy", paramValue("mergeStrategy"))
@@ -1569,6 +1574,7 @@ func (h *zipUploadHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		problemSettings,
 		zipMergeStrategy,
 		acceptsSubmissions,
+		updatePublished,
 		h.protocol,
 		h.log,
 	)

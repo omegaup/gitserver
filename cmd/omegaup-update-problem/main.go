@@ -33,6 +33,7 @@ var (
 	zipPath            = flag.String("zip-path", "", "Path of the .zip file")
 	mergeStrategyName  = flag.String("merge-strategy", "theirs", "Merge strategy to use. Valid values are 'ours', 'theirs', 'statement-ours', and 'recursive-theirs'")
 	acceptsSubmissions = flag.Bool("accepts-submissions", true, "Problem accepts submissions")
+	updatePublished    = flag.Bool("update-published", false, "Update the published branch")
 	libinteractivePath = flag.String("libinteractive-path", "/usr/share/java/libinteractive.jar", "Path of libinteractive.jar")
 
 	// Flags that are used when updating a repository with a []BlobUpdate.
@@ -60,6 +61,7 @@ func commitZipFile(
 	problemSettings *common.ProblemSettings,
 	zipMergeStrategy gitserver.ZipMergeStrategy,
 	acceptsSubmissions bool,
+	updatePublished bool,
 	log log15.Logger,
 ) (*gitserver.UpdateResult, error) {
 	ctx := request.NewContext(context.Background(), &base.NoOpMetrics{})
@@ -91,6 +93,7 @@ func commitZipFile(
 		problemSettings,
 		zipMergeStrategy,
 		acceptsSubmissions,
+		updatePublished,
 		protocol,
 		log,
 	)
@@ -435,6 +438,7 @@ func main() {
 			problemSettings,
 			zipMergeStrategy,
 			*acceptsSubmissions,
+			*updatePublished,
 			log,
 		)
 		if err != nil {
@@ -504,6 +508,7 @@ func main() {
 			problemSettings,
 			gitserver.ZipMergeStrategyOurs,
 			*acceptsSubmissions,
+			*updatePublished,
 			log,
 		)
 		if err != nil {

@@ -63,6 +63,7 @@ func getTreeOid(t *testing.T, extraFileContents map[string]io.Reader, log log15.
 		nil,
 		gitserver.ZipMergeStrategyTheirs,
 		true,
+		true,
 		log,
 	); err != nil {
 		t.Fatalf("Failed to commit zip: %v", err)
@@ -236,6 +237,7 @@ func TestProblemUpdateZip(t *testing.T) {
 			nil,
 			gitserver.ZipMergeStrategyTheirs,
 			true,
+			true,
 			log,
 		)
 		if err != nil {
@@ -290,6 +292,7 @@ func TestProblemUpdateZip(t *testing.T) {
 			"fix a typo",
 			nil,
 			gitserver.ZipMergeStrategyTheirs,
+			true,
 			true,
 			log,
 		)
@@ -366,6 +369,7 @@ func TestProblemUpdateBlobs(t *testing.T) {
 			"initial commit",
 			nil,
 			gitserver.ZipMergeStrategyTheirs,
+			true,
 			true,
 			log,
 		)
