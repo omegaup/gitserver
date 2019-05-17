@@ -34,6 +34,34 @@ const (
 	}
 }
 `
+
+	// CustomValidatorSettingsJSON is the JSON representation of a problem with
+	// just one case called "0" and a custom validator.
+	CustomValidatorSettingsJSON = `{
+	"Cases": [
+		{
+			"Cases": [
+				{
+					"Name": "0",
+					"Weight": 1
+				}
+			],
+			"Name": "0"
+		}
+	],
+	"Limits": {
+		"ExtraWallTime": "0s",
+		"MemoryLimit": 33554432,
+		"OutputLimit": 10240,
+		"OverallWallTimeLimit": "1m0s",
+		"TimeLimit": "1s"
+	},
+	"Slow": false,
+	"Validator": {
+		"Name": "custom"
+	}
+}
+`
 )
 
 // CreateZip creates a .zip file from the given file contents.

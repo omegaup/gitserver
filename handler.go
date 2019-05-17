@@ -751,7 +751,9 @@ func validateUpdateMaster(
 		return base.ErrorWithCategory(
 			ErrProblemBadLayout,
 			errors.Errorf(
-				"problem with unused validator",
+				"problem requested using validator %s, but has an unused validator.%s file",
+				problemSettings.Validator.Name,
+				validatorLang,
 			),
 		)
 	}

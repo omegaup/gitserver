@@ -955,7 +955,6 @@ func CreatePackfile(
 
 func getUpdatedProblemSettings(
 	problemSettings *common.ProblemSettings,
-	zipMergeStrategy ZipMergeStrategy,
 	repo *git.Repository,
 	parent *git.Oid,
 ) (*common.ProblemSettings, error) {
@@ -1013,25 +1012,6 @@ func getUpdatedProblemSettings(
 				"settings.json",
 			),
 		)
-	}
-
-	if updatedProblemSettings.Validator.Name != problemSettings.Validator.Name {
-		if updatedProblemSettings.Validator.Name == "custom" {
-			return nil, base.ErrorWithCategory(
-				ErrProblemBadLayout,
-				errors.Errorf(
-					"problem with unused validator",
-				),
-			)
-		}
-		if problemSettings.Validator.Name == "custom" {
-			return nil, base.ErrorWithCategory(
-				ErrProblemBadLayout,
-				errors.Errorf(
-					"problem with custom validator missing a validator",
-				),
-			)
-		}
 	}
 
 	updatedProblemSettings.Limits = problemSettings.Limits
@@ -1139,7 +1119,6 @@ func ConvertZipToPackfile(
 			var err error
 			if settings, err = getUpdatedProblemSettings(
 				settings,
-				zipMergeStrategy,
 				repo,
 				parent,
 			); err != nil {

@@ -111,7 +111,7 @@ func postZip(
 }
 
 func TestPushZip(t *testing.T) {
-	tmpDir, err := ioutil.TempDir("", "handler_test")
+	tmpDir, err := ioutil.TempDir("", t.Name())
 	if err != nil {
 		t.Fatalf("Failed to create directory: %v", err)
 	}
@@ -184,7 +184,7 @@ func TestPushZip(t *testing.T) {
 }
 
 func TestConvertZip(t *testing.T) {
-	tmpDir, err := ioutil.TempDir("", "handler_test")
+	tmpDir, err := ioutil.TempDir("", t.Name())
 	if err != nil {
 		t.Fatalf("Failed to create directory: %v", err)
 	}
@@ -264,7 +264,7 @@ func TestConvertZip(t *testing.T) {
 }
 
 func TestUpdateProblemSettings(t *testing.T) {
-	tmpDir, err := ioutil.TempDir("", "handler_test")
+	tmpDir, err := ioutil.TempDir("", t.Name())
 	if err != nil {
 		t.Fatalf("Failed to create directory: %v", err)
 	}
@@ -391,6 +391,252 @@ func TestUpdateProblemSettings(t *testing.T) {
 
 		expectedUpdatedFiles := map[string]struct{}{
 			"statements/es.markdown": {},
+		}
+		if !reflect.DeepEqual(expectedUpdatedFiles, updatedFiles) {
+			t.Errorf("mismatched updated files, expected %v, got %v", expectedUpdatedFiles, updatedFiles)
+		}
+	}
+}
+
+func TestUpdateProblemSettingsWithCustomValidator(t *testing.T) {
+	tmpDir, err := ioutil.TempDir("", t.Name())
+	if err != nil {
+		t.Fatalf("Failed to create directory: %v", err)
+	}
+	if os.Getenv("PRESERVE") == "" {
+		defer os.RemoveAll(tmpDir)
+	}
+
+	log := base.StderrLog()
+	ts := httptest.NewServer(ZipHandler(
+		tmpDir,
+		NewGitProtocol(authorize, nil, true, OverallWallTimeHardLimit, fakeInteractiveSettingsCompiler, log),
+		&base.NoOpMetrics{},
+		log,
+	))
+	defer ts.Close()
+
+	problemAlias := "sumas-validator"
+
+	// Create the problem.
+	{
+		zipContents, err := gitservertest.CreateZip(
+			map[string]io.Reader{
+				"settings.json":          strings.NewReader(gitservertest.CustomValidatorSettingsJSON),
+				"cases/0.in":             strings.NewReader("1 2\n"),
+				"cases/0.out":            strings.NewReader("3\n"),
+				"statements/es.markdown": strings.NewReader("Sumaz\n"),
+				"validator.py":           strings.NewReader("print 1\n"),
+			},
+		)
+		if err != nil {
+			t.Fatalf("Failed to create zip: %v", err)
+		}
+		postZip(
+			t,
+			adminAuthorization,
+			problemAlias,
+			nil,
+			ZipMergeStrategyTheirs,
+			zipContents,
+			"initial commit",
+			true, // create
+			true, // useMultipartFormData
+			ts,
+		)
+	}
+
+	// Update settings.
+	{
+		zipContents, err := gitservertest.CreateZip(
+			map[string]io.Reader{},
+		)
+		if err != nil {
+			t.Fatalf("Failed to create zip: %v", err)
+		}
+		problemSettings := &common.ProblemSettings{
+			Limits: common.LimitsSettings{
+				ExtraWallTime:        base.Duration(0),
+				MemoryLimit:          33554432,
+				OutputLimit:          10240,
+				OverallWallTimeLimit: base.Duration(5 * time.Minute),
+				TimeLimit:            base.Duration(time.Second),
+			},
+			Slow: false,
+			Validator: common.ValidatorSettings{
+				Name: "custom",
+			},
+		}
+		updateResult := postZip(
+			t,
+			adminAuthorization,
+			problemAlias,
+			problemSettings,
+			ZipMergeStrategyOurs,
+			zipContents,
+			"updated settings",
+			false, // create
+			false, // useMultipartFormData
+			ts,
+		)
+
+		updatedFiles := make(map[string]struct{})
+		for _, updatedFile := range updateResult.UpdatedFiles {
+			updatedFiles[updatedFile.Path] = struct{}{}
+			if updatedFile.Type != "modified" {
+				t.Errorf("unexpected updated file: %v", updatedFile)
+			}
+		}
+
+		expectedUpdatedFiles := map[string]struct{}{
+			"settings.json":         {},
+			"settings.distrib.json": {},
+		}
+		if !reflect.DeepEqual(expectedUpdatedFiles, updatedFiles) {
+			t.Errorf("mismatched updated files, expected %v, got %v", expectedUpdatedFiles, updatedFiles)
+		}
+	}
+
+	// Update statements.
+	{
+		zipContents, err := gitservertest.CreateZip(
+			map[string]io.Reader{
+				"statements/es.markdown": strings.NewReader("Sumas\n"),
+			},
+		)
+		if err != nil {
+			t.Fatalf("Failed to create zip: %v", err)
+		}
+		updateResult := postZip(
+			t,
+			adminAuthorization,
+			problemAlias,
+			nil,
+			ZipMergeStrategyRecursiveTheirs,
+			zipContents,
+			"updated statement",
+			false, // create
+			false, // useMultipartFormData
+			ts,
+		)
+
+		updatedFiles := make(map[string]struct{})
+		for _, updatedFile := range updateResult.UpdatedFiles {
+			updatedFiles[updatedFile.Path] = struct{}{}
+			if updatedFile.Type != "modified" {
+				t.Errorf("unexpected updated file: %v", updatedFile)
+			}
+		}
+
+		expectedUpdatedFiles := map[string]struct{}{
+			"statements/es.markdown": {},
+		}
+		if !reflect.DeepEqual(expectedUpdatedFiles, updatedFiles) {
+			t.Errorf("mismatched updated files, expected %v, got %v", expectedUpdatedFiles, updatedFiles)
+		}
+	}
+
+	// Use token validator.
+	{
+		zipContents, err := gitservertest.CreateZip(
+			map[string]io.Reader{
+				"cases/0.in":             strings.NewReader("1 2\n"),
+				"cases/0.out":            strings.NewReader("3\n"),
+				"statements/es.markdown": strings.NewReader("Sumas\n"),
+			},
+		)
+		if err != nil {
+			t.Fatalf("Failed to create zip: %v", err)
+		}
+		problemSettings := &common.ProblemSettings{
+			Limits: common.LimitsSettings{
+				ExtraWallTime:        base.Duration(0),
+				MemoryLimit:          33554432,
+				OutputLimit:          10240,
+				OverallWallTimeLimit: base.Duration(5 * time.Minute),
+				TimeLimit:            base.Duration(time.Second),
+			},
+			Slow: false,
+			Validator: common.ValidatorSettings{
+				Name: "token-caseless",
+			},
+		}
+		updateResult := postZip(
+			t,
+			adminAuthorization,
+			problemAlias,
+			problemSettings,
+			ZipMergeStrategyTheirs,
+			zipContents,
+			"updated validator",
+			false, // create
+			false, // useMultipartFormData
+			ts,
+		)
+
+		updatedFiles := make(map[string]string)
+		for _, updatedFile := range updateResult.UpdatedFiles {
+			updatedFiles[updatedFile.Path] = updatedFile.Type
+		}
+
+		expectedUpdatedFiles := map[string]string{
+			"settings.distrib.json": "modified",
+			"settings.json":         "modified",
+			"validator.py":          "deleted",
+		}
+		if !reflect.DeepEqual(expectedUpdatedFiles, updatedFiles) {
+			t.Errorf("mismatched updated files, expected %v, got %v", expectedUpdatedFiles, updatedFiles)
+		}
+	}
+
+	// Restore custom validator.
+	{
+		zipContents, err := gitservertest.CreateZip(
+			map[string]io.Reader{
+				"cases/0.in":             strings.NewReader("1 2\n"),
+				"cases/0.out":            strings.NewReader("3\n"),
+				"statements/es.markdown": strings.NewReader("Sumas\n"),
+				"validator.py":           strings.NewReader("print 1\n"),
+			},
+		)
+		if err != nil {
+			t.Fatalf("Failed to create zip: %v", err)
+		}
+		problemSettings := &common.ProblemSettings{
+			Limits: common.LimitsSettings{
+				ExtraWallTime:        base.Duration(0),
+				MemoryLimit:          33554432,
+				OutputLimit:          10240,
+				OverallWallTimeLimit: base.Duration(5 * time.Minute),
+				TimeLimit:            base.Duration(time.Second),
+			},
+			Slow: false,
+			Validator: common.ValidatorSettings{
+				Name: "custom",
+			},
+		}
+		updateResult := postZip(
+			t,
+			adminAuthorization,
+			problemAlias,
+			problemSettings,
+			ZipMergeStrategyTheirs,
+			zipContents,
+			"updated validator",
+			false, // create
+			false, // useMultipartFormData
+			ts,
+		)
+
+		updatedFiles := make(map[string]string)
+		for _, updatedFile := range updateResult.UpdatedFiles {
+			updatedFiles[updatedFile.Path] = updatedFile.Type
+		}
+
+		expectedUpdatedFiles := map[string]string{
+			"settings.distrib.json": "modified",
+			"settings.json":         "modified",
+			"validator.py":          "added",
 		}
 		if !reflect.DeepEqual(expectedUpdatedFiles, updatedFiles) {
 			t.Errorf("mismatched updated files, expected %v, got %v", expectedUpdatedFiles, updatedFiles)
