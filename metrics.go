@@ -3,6 +3,7 @@ package gitserver
 import (
 	base "github.com/omegaup/go-base"
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"net/http"
 )
 
@@ -46,5 +47,5 @@ func SetupMetrics() (base.Metrics, http.Handler) {
 		prometheus.MustRegister(summary)
 	}
 
-	return &prometheusMetrics{}, prometheus.Handler()
+	return &prometheusMetrics{}, promhttp.Handler()
 }
