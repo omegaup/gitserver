@@ -259,7 +259,7 @@ func push(
 }
 
 func TestInvalidRef(t *testing.T) {
-	tmpDir, err := ioutil.TempDir("", "handler_test")
+	tmpDir, err := ioutil.TempDir("", t.Name())
 	if err != nil {
 		t.Fatalf("Failed to create directory: %v", err)
 	}
@@ -331,7 +331,7 @@ func TestInvalidRef(t *testing.T) {
 }
 
 func TestDelete(t *testing.T) {
-	tmpDir, err := ioutil.TempDir("", "handler_test")
+	tmpDir, err := ioutil.TempDir("", t.Name())
 	if err != nil {
 		t.Fatalf("Failed to create directory: %v", err)
 	}
@@ -406,7 +406,7 @@ func TestDelete(t *testing.T) {
 }
 
 func TestServerCreateReview(t *testing.T) {
-	tmpDir, err := ioutil.TempDir("", "handler_test")
+	tmpDir, err := ioutil.TempDir("", t.Name())
 	if err != nil {
 		t.Fatalf("Failed to create directory: %v", err)
 	}
@@ -1195,7 +1195,7 @@ func TestServerCreateReview(t *testing.T) {
 }
 
 func TestPushGitbomb(t *testing.T) {
-	tmpDir, err := ioutil.TempDir("", "handler_test")
+	tmpDir, err := ioutil.TempDir("", t.Name())
 	if err != nil {
 		t.Fatalf("Failed to create directory: %v", err)
 	}
@@ -1312,7 +1312,7 @@ func TestPushGitbomb(t *testing.T) {
 }
 
 func TestConfig(t *testing.T) {
-	tmpDir, err := ioutil.TempDir("", "handler_test")
+	tmpDir, err := ioutil.TempDir("", t.Name())
 	if err != nil {
 		t.Fatalf("Failed to create directory: %v", err)
 	}
@@ -1659,7 +1659,7 @@ func getProblemDistribSettings(repo *git.Repository, tree *git.Tree) (*common.Li
 }
 
 func TestInteractive(t *testing.T) {
-	tmpDir, err := ioutil.TempDir("", "handler_test")
+	tmpDir, err := ioutil.TempDir("", t.Name())
 	if err != nil {
 		t.Fatalf("Failed to create directory: %v", err)
 	}
@@ -1828,7 +1828,7 @@ int main(int argc, char* argv[]) {
 }
 
 func TestExampleCases(t *testing.T) {
-	tmpDir, err := ioutil.TempDir("", "handler_test")
+	tmpDir, err := ioutil.TempDir("", t.Name())
 	if err != nil {
 		t.Fatalf("Failed to create directory: %v", err)
 	}
@@ -2149,5 +2149,376 @@ missing the end thingy`,
 				actualOutput,
 			)
 		}
+	}
+}
+
+func TestTests(t *testing.T) {
+	tmpDir, err := ioutil.TempDir("", t.Name())
+	if err != nil {
+		t.Fatalf("Failed to create directory: %v", err)
+	}
+	if os.Getenv("PRESERVE") == "" {
+		defer os.RemoveAll(tmpDir)
+	}
+
+	log := base.StderrLog()
+	ts := httptest.NewServer(GitHandler(
+		tmpDir,
+		NewGitProtocol(authorize, nil, true, OverallWallTimeHardLimit, fakeInteractiveSettingsCompiler, log),
+		&base.NoOpMetrics{},
+		log,
+	))
+	defer ts.Close()
+
+	problemAlias := "sumas"
+
+	repo, err := InitRepository(path.Join(tmpDir, problemAlias))
+	if err != nil {
+		t.Fatalf("Failed to initialize git repository: %v", err)
+	}
+	defer repo.Free()
+
+	// tests is not a directory.
+	{
+		newOid, packContents := createCommit(
+			t,
+			tmpDir,
+			problemAlias,
+			&git.Oid{},
+			map[string]io.Reader{
+				"settings.json":          strings.NewReader(gitservertest.DefaultSettingsJSON),
+				"cases/0.in":             strings.NewReader("1 2"),
+				"cases/0.out":            strings.NewReader("3"),
+				"statements/es.markdown": strings.NewReader("Sumas"),
+				"tests":                  strings.NewReader(""),
+			},
+			"Initial commit",
+			log,
+		)
+		push(
+			t,
+			tmpDir,
+			adminAuthorization,
+			problemAlias,
+			"refs/heads/master",
+			&git.Oid{}, newOid,
+			packContents,
+			[]githttp.PktLineResponse{
+				{Line: "unpack ok\n", Err: nil},
+				{Line: "ng refs/heads/master tests-bad-layout: tests/ directory is not a tree\n", Err: nil},
+			},
+			ts,
+		)
+	}
+
+	// Missing tests/settings.json
+	{
+		newOid, packContents := createCommit(
+			t,
+			tmpDir,
+			problemAlias,
+			&git.Oid{},
+			map[string]io.Reader{
+				"settings.json":          strings.NewReader(gitservertest.DefaultSettingsJSON),
+				"cases/0.in":             strings.NewReader("1 2"),
+				"cases/0.out":            strings.NewReader("3"),
+				"statements/es.markdown": strings.NewReader("Sumas"),
+				"tests/foo":              strings.NewReader(""),
+			},
+			"Initial commit",
+			log,
+		)
+		push(
+			t,
+			tmpDir,
+			adminAuthorization,
+			problemAlias,
+			"refs/heads/master",
+			&git.Oid{}, newOid,
+			packContents,
+			[]githttp.PktLineResponse{
+				{Line: "unpack ok\n", Err: nil},
+				{Line: "ng refs/heads/master tests-bad-layout: tests/settings.json is missing\n", Err: nil},
+			},
+			ts,
+		)
+	}
+
+	// Corrupt settings.json
+	{
+		newOid, packContents := createCommit(
+			t,
+			tmpDir,
+			problemAlias,
+			&git.Oid{},
+			map[string]io.Reader{
+				"settings.json":          strings.NewReader(gitservertest.DefaultSettingsJSON),
+				"cases/0.in":             strings.NewReader("1 2"),
+				"cases/0.out":            strings.NewReader("3"),
+				"statements/es.markdown": strings.NewReader("Sumas"),
+				"tests/settings.json":    strings.NewReader(""),
+			},
+			"Initial commit",
+			log,
+		)
+		push(
+			t,
+			tmpDir,
+			adminAuthorization,
+			problemAlias,
+			"refs/heads/master",
+			&git.Oid{}, newOid,
+			packContents,
+			[]githttp.PktLineResponse{
+				{Line: "unpack ok\n", Err: nil},
+				{Line: "ng refs/heads/master json-parse-error: tests/settings.json: unexpected end of JSON input\n", Err: nil},
+			},
+			ts,
+		)
+	}
+
+	// Missing validator.
+	{
+		newOid, packContents := createCommit(
+			t,
+			tmpDir,
+			problemAlias,
+			&git.Oid{},
+			map[string]io.Reader{
+				"settings.json":          strings.NewReader(gitservertest.DefaultSettingsJSON),
+				"cases/0.in":             strings.NewReader("1 2"),
+				"cases/0.out":            strings.NewReader("3"),
+				"statements/es.markdown": strings.NewReader("Sumas"),
+				"tests/settings.json": strings.NewReader(`{
+					"solutions": [
+						{
+							"filename": "foo.py"
+						}
+					]
+				}`),
+			},
+			"Initial commit",
+			log,
+		)
+		push(
+			t,
+			tmpDir,
+			adminAuthorization,
+			problemAlias,
+			"refs/heads/master",
+			&git.Oid{}, newOid,
+			packContents,
+			[]githttp.PktLineResponse{
+				{Line: "unpack ok\n", Err: nil},
+				{Line: "ng refs/heads/master tests-bad-layout: tests/foo.py is missing\n", Err: nil},
+			},
+			ts,
+		)
+	}
+
+	// Missing score_range and verdict
+	{
+		newOid, packContents := createCommit(
+			t,
+			tmpDir,
+			problemAlias,
+			&git.Oid{},
+			map[string]io.Reader{
+				"settings.json":          strings.NewReader(gitservertest.DefaultSettingsJSON),
+				"cases/0.in":             strings.NewReader("1 2"),
+				"cases/0.out":            strings.NewReader("3"),
+				"statements/es.markdown": strings.NewReader("Sumas"),
+				"tests/settings.json": strings.NewReader(`{
+					"solutions": [
+						{
+							"filename": "foo.py"
+						}
+					]
+				}`),
+				"tests/foo.py": strings.NewReader("print 1"),
+			},
+			"Initial commit",
+			log,
+		)
+		push(
+			t,
+			tmpDir,
+			adminAuthorization,
+			problemAlias,
+			"refs/heads/master",
+			&git.Oid{}, newOid,
+			packContents,
+			[]githttp.PktLineResponse{
+				{Line: "unpack ok\n", Err: nil},
+				{Line: "ng refs/heads/master tests-bad-layout: score_range or validator for foo.py in tests/settings.json should be set\n", Err: nil},
+			},
+			ts,
+		)
+	}
+
+	// Missing score_range.
+	{
+		newOid, packContents := createCommit(
+			t,
+			tmpDir,
+			problemAlias,
+			&git.Oid{},
+			map[string]io.Reader{
+				"settings.json":          strings.NewReader(gitservertest.DefaultSettingsJSON),
+				"cases/0.in":             strings.NewReader("1 2"),
+				"cases/0.out":            strings.NewReader("3"),
+				"statements/es.markdown": strings.NewReader("Sumas"),
+				"tests/settings.json": strings.NewReader(`{
+					"solutions": [
+						{
+							"filename": "foo.py",
+							"score_range": [1]
+						}
+					]
+				}`),
+				"tests/foo.py": strings.NewReader("print 1"),
+			},
+			"Initial commit",
+			log,
+		)
+		push(
+			t,
+			tmpDir,
+			adminAuthorization,
+			problemAlias,
+			"refs/heads/master",
+			&git.Oid{}, newOid,
+			packContents,
+			[]githttp.PktLineResponse{
+				{Line: "unpack ok\n", Err: nil},
+				{Line: "ng refs/heads/master tests-bad-layout: score_range for foo.py in tests/settings.json should be of length 2\n", Err: nil},
+			},
+			ts,
+		)
+	}
+
+	// Bad score_range.
+	{
+		newOid, packContents := createCommit(
+			t,
+			tmpDir,
+			problemAlias,
+			&git.Oid{},
+			map[string]io.Reader{
+				"settings.json":          strings.NewReader(gitservertest.DefaultSettingsJSON),
+				"cases/0.in":             strings.NewReader("1 2"),
+				"cases/0.out":            strings.NewReader("3"),
+				"statements/es.markdown": strings.NewReader("Sumas"),
+				"tests/settings.json": strings.NewReader(`{
+					"solutions": [
+						{
+							"filename": "foo.py",
+							"score_range": [-1, 10]
+						}
+					]
+				}`),
+				"tests/foo.py": strings.NewReader("print 1"),
+			},
+			"Initial commit",
+			log,
+		)
+		push(
+			t,
+			tmpDir,
+			adminAuthorization,
+			problemAlias,
+			"refs/heads/master",
+			&git.Oid{}, newOid,
+			packContents,
+			[]githttp.PktLineResponse{
+				{Line: "unpack ok\n", Err: nil},
+				{Line: "ng refs/heads/master tests-bad-layout: values for score_range for foo.py in tests/settings.json should be sorted and in the interval [0, 1]\n", Err: nil},
+			},
+			ts,
+		)
+	}
+
+	// Bad verdict
+	{
+		newOid, packContents := createCommit(
+			t,
+			tmpDir,
+			problemAlias,
+			&git.Oid{},
+			map[string]io.Reader{
+				"settings.json":          strings.NewReader(gitservertest.DefaultSettingsJSON),
+				"cases/0.in":             strings.NewReader("1 2"),
+				"cases/0.out":            strings.NewReader("3"),
+				"statements/es.markdown": strings.NewReader("Sumas"),
+				"tests/settings.json": strings.NewReader(`{
+					"solutions": [
+						{
+							"filename": "foo.py",
+							"score_range": [0, 1],
+							"verdict": "COOL VERDICT, BRO."
+						}
+					]
+				}`),
+				"tests/foo.py": strings.NewReader("print 1"),
+			},
+			"Initial commit",
+			log,
+		)
+		push(
+			t,
+			tmpDir,
+			adminAuthorization,
+			problemAlias,
+			"refs/heads/master",
+			&git.Oid{}, newOid,
+			packContents,
+			[]githttp.PktLineResponse{
+				{Line: "unpack ok\n", Err: nil},
+				{Line: "ng refs/heads/master tests-bad-layout: verdict for foo.py in tests/settings.json is not valid\n", Err: nil},
+			},
+			ts,
+		)
+	}
+
+	// Valid
+	{
+		newOid, packContents := createCommit(
+			t,
+			tmpDir,
+			problemAlias,
+			&git.Oid{},
+			map[string]io.Reader{
+				"settings.json":          strings.NewReader(gitservertest.DefaultSettingsJSON),
+				"cases/0.in":             strings.NewReader("1 2"),
+				"cases/0.out":            strings.NewReader("3"),
+				"statements/es.markdown": strings.NewReader("Sumas"),
+				"tests/settings.json": strings.NewReader(`{
+					"solutions": [
+						{
+							"filename": "foo.py",
+							"score_range": [1, 1],
+							"verdict": "AC"
+						}
+					]
+				}`),
+				"tests/foo.py": strings.NewReader("print 1"),
+			},
+			"Initial commit",
+			log,
+		)
+		push(
+			t,
+			tmpDir,
+			adminAuthorization,
+			problemAlias,
+			"refs/heads/master",
+			&git.Oid{}, newOid,
+			packContents,
+			[]githttp.PktLineResponse{
+				{Line: "unpack ok\n", Err: nil},
+				{Line: "ok refs/heads/master\n", Err: nil},
+			},
+			ts,
+		)
 	}
 }

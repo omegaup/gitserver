@@ -63,6 +63,10 @@ var (
 	// contain the correct layout.
 	ErrConfigBadLayout = stderrors.New("config-bad-layout")
 
+	// ErrTestsBadLayout is returned if the tests/ directory does not contain the
+	// correct layout.
+	ErrTestsBadLayout = stderrors.New("tests-bad-layout")
+
 	// ErrInteractiveBadLayout is returned if the interactive/ directory does not
 	// contain the correct layout.
 	ErrInteractiveBadLayout = stderrors.New("interactive-bad-layout")
@@ -557,6 +561,125 @@ func validateUpdateMaster(
 	if err != nil {
 		// getProblemSettings already wrapped the error correctly.
 		return err
+	}
+
+	// Tests.
+	testsTreeEntry := tree.EntryByName("tests")
+	if testsTreeEntry != nil {
+		if testsTreeEntry.Type != git.ObjectTree {
+			return base.ErrorWithCategory(
+				ErrTestsBadLayout,
+				errors.New("tests/ directory is not a tree"),
+			)
+		}
+		testsTree, err := repository.LookupTree(testsTreeEntry.Id)
+		if err != nil {
+			return base.ErrorWithCategory(
+				ErrInternalGit,
+				errors.Wrap(
+					err,
+					"failed to lookup the tests/ tree",
+				),
+			)
+		}
+		defer testsTree.Free()
+
+		testSettingsJSONEntry := testsTree.EntryByName("settings.json")
+		if testSettingsJSONEntry == nil {
+			return base.ErrorWithCategory(
+				ErrTestsBadLayout,
+				errors.New("tests/settings.json is missing"),
+			)
+		}
+		testSettingsJSONBlob, err := repository.LookupBlob(testSettingsJSONEntry.Id)
+		if err != nil {
+			return base.ErrorWithCategory(
+				ErrInternalGit,
+				errors.Wrap(
+					err,
+					"failed to lookup tests/settings.json",
+				),
+			)
+		}
+		defer testSettingsJSONBlob.Free()
+
+		var testsSettings common.TestsSettings
+		if err := json.Unmarshal(testSettingsJSONBlob.Contents(), &testsSettings); err != nil {
+			return base.ErrorWithCategory(
+				ErrJSONParseError,
+				errors.Wrap(
+					err,
+					"tests/settings.json",
+				),
+			)
+		}
+
+		for _, solutionSettings := range testsSettings.Solutions {
+			if solutionEntry := testsTree.EntryByName(solutionSettings.Filename); solutionEntry == nil {
+				return base.ErrorWithCategory(
+					ErrTestsBadLayout,
+					errors.Errorf(
+						"tests/%s is missing",
+						solutionSettings.Filename,
+					),
+				)
+			}
+
+			if solutionSettings.ScoreRange == nil && solutionSettings.Verdict == "" {
+				return base.ErrorWithCategory(
+					ErrTestsBadLayout,
+					errors.Errorf(
+						"score_range or validator for %s in tests/settings.json should be set",
+						solutionSettings.Filename,
+					),
+				)
+			}
+
+			if solutionSettings.ScoreRange != nil {
+				if len(solutionSettings.ScoreRange) != 2 ||
+					solutionSettings.ScoreRange[0] == nil ||
+					solutionSettings.ScoreRange[1] == nil {
+					return base.ErrorWithCategory(
+						ErrTestsBadLayout,
+						errors.Errorf(
+							"score_range for %s in tests/settings.json should be of length 2",
+							solutionSettings.Filename,
+						),
+					)
+				}
+
+				if (&big.Rat{}).Cmp(solutionSettings.ScoreRange[0]) > 0 ||
+					solutionSettings.ScoreRange[0].Cmp(solutionSettings.ScoreRange[1]) > 0 ||
+					solutionSettings.ScoreRange[1].Cmp(big.NewRat(1, 1)) > 0 {
+					return base.ErrorWithCategory(
+						ErrTestsBadLayout,
+						errors.Errorf(
+							"values for score_range for %s in tests/settings.json should be sorted and in the interval [0, 1]",
+							solutionSettings.Filename,
+						),
+					)
+				}
+			}
+
+			if solutionSettings.Verdict != "" {
+				foundVerdict := false
+				for _, verdict := range common.VerdictList {
+					if verdict == solutionSettings.Verdict {
+						foundVerdict = true
+						break
+					}
+				}
+				if !foundVerdict {
+					return base.ErrorWithCategory(
+						ErrTestsBadLayout,
+						errors.Errorf(
+							"verdict for %s in tests/settings.json is not valid",
+							solutionSettings.Filename,
+						),
+					)
+				}
+			}
+		}
 	}
 
 	// Interactive settings.
