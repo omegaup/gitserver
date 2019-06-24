@@ -584,11 +584,11 @@ func validateUpdateMaster(
 		}
 		defer testsTree.Free()
 
-		testSettingsJSONEntry := testsTree.EntryByName("settings.json")
+		testSettingsJSONEntry := testsTree.EntryByName("tests.json")
 		if testSettingsJSONEntry == nil {
 			return base.ErrorWithCategory(
 				ErrTestsBadLayout,
-				errors.New("tests/settings.json is missing"),
+				errors.New("tests/tests.json is missing"),
 			)
 		}
 		testSettingsJSONBlob, err := repository.LookupBlob(testSettingsJSONEntry.Id)
@@ -597,7 +597,7 @@ func validateUpdateMaster(
 				ErrInternalGit,
 				errors.Wrap(
 					err,
-					"failed to lookup tests/settings.json",
+					"failed to lookup tests/tests.json",
 				),
 			)
 		}
@@ -609,7 +609,7 @@ func validateUpdateMaster(
 				ErrJSONParseError,
 				errors.Wrap(
 					err,
-					"tests/settings.json",
+					"tests/tests.json",
 				),
 			)
 		}
@@ -629,7 +629,7 @@ func validateUpdateMaster(
 				return base.ErrorWithCategory(
 					ErrTestsBadLayout,
 					errors.Errorf(
-						"score_range or validator for %s in tests/settings.json should be set",
+						"score_range or validator for %s in tests/tests.json should be set",
 						solutionSettings.Filename,
 					),
 				)
@@ -642,7 +642,7 @@ func validateUpdateMaster(
 					return base.ErrorWithCategory(
 						ErrTestsBadLayout,
 						errors.Errorf(
-							"score_range for %s in tests/settings.json should be of length 2",
+							"score_range for %s in tests/tests.json should be of length 2",
 							solutionSettings.Filename,
 						),
 					)
@@ -654,7 +654,7 @@ func validateUpdateMaster(
 					return base.ErrorWithCategory(
 						ErrTestsBadLayout,
 						errors.Errorf(
-							"values for score_range for %s in tests/settings.json should be sorted and in the interval [0, 1]",
+							"values for score_range for %s in tests/tests.json should be sorted and in the interval [0, 1]",
 							solutionSettings.Filename,
 						),
 					)
@@ -673,7 +673,7 @@ func validateUpdateMaster(
 					return base.ErrorWithCategory(
 						ErrTestsBadLayout,
 						errors.Errorf(
-							"verdict for %s in tests/settings.json is not valid",
+							"verdict for %s in tests/tests.json is not valid",
 							solutionSettings.Filename,
 						),
 					)

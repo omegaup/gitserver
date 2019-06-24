@@ -2211,7 +2211,7 @@ func TestTests(t *testing.T) {
 		)
 	}
 
-	// Missing tests/settings.json
+	// Missing tests/tests.json
 	{
 		newOid, packContents := createCommit(
 			t,
@@ -2238,7 +2238,7 @@ func TestTests(t *testing.T) {
 			packContents,
 			[]githttp.PktLineResponse{
 				{Line: "unpack ok\n", Err: nil},
-				{Line: "ng refs/heads/master tests-bad-layout: tests/settings.json is missing\n", Err: nil},
+				{Line: "ng refs/heads/master tests-bad-layout: tests/tests.json is missing\n", Err: nil},
 			},
 			ts,
 		)
@@ -2256,7 +2256,7 @@ func TestTests(t *testing.T) {
 				"cases/0.in":             strings.NewReader("1 2"),
 				"cases/0.out":            strings.NewReader("3"),
 				"statements/es.markdown": strings.NewReader("Sumas"),
-				"tests/settings.json":    strings.NewReader(""),
+				"tests/tests.json":       strings.NewReader(""),
 			},
 			"Initial commit",
 			log,
@@ -2271,7 +2271,7 @@ func TestTests(t *testing.T) {
 			packContents,
 			[]githttp.PktLineResponse{
 				{Line: "unpack ok\n", Err: nil},
-				{Line: "ng refs/heads/master json-parse-error: tests/settings.json: unexpected end of JSON input\n", Err: nil},
+				{Line: "ng refs/heads/master json-parse-error: tests/tests.json: unexpected end of JSON input\n", Err: nil},
 			},
 			ts,
 		)
@@ -2289,7 +2289,7 @@ func TestTests(t *testing.T) {
 				"cases/0.in":             strings.NewReader("1 2"),
 				"cases/0.out":            strings.NewReader("3"),
 				"statements/es.markdown": strings.NewReader("Sumas"),
-				"tests/settings.json": strings.NewReader(`{
+				"tests/tests.json": strings.NewReader(`{
 					"solutions": [
 						{
 							"filename": "foo.py"
@@ -2328,7 +2328,7 @@ func TestTests(t *testing.T) {
 				"cases/0.in":             strings.NewReader("1 2"),
 				"cases/0.out":            strings.NewReader("3"),
 				"statements/es.markdown": strings.NewReader("Sumas"),
-				"tests/settings.json": strings.NewReader(`{
+				"tests/tests.json": strings.NewReader(`{
 					"solutions": [
 						{
 							"filename": "foo.py"
@@ -2350,7 +2350,7 @@ func TestTests(t *testing.T) {
 			packContents,
 			[]githttp.PktLineResponse{
 				{Line: "unpack ok\n", Err: nil},
-				{Line: "ng refs/heads/master tests-bad-layout: score_range or validator for foo.py in tests/settings.json should be set\n", Err: nil},
+				{Line: "ng refs/heads/master tests-bad-layout: score_range or validator for foo.py in tests/tests.json should be set\n", Err: nil},
 			},
 			ts,
 		)
@@ -2368,7 +2368,7 @@ func TestTests(t *testing.T) {
 				"cases/0.in":             strings.NewReader("1 2"),
 				"cases/0.out":            strings.NewReader("3"),
 				"statements/es.markdown": strings.NewReader("Sumas"),
-				"tests/settings.json": strings.NewReader(`{
+				"tests/tests.json": strings.NewReader(`{
 					"solutions": [
 						{
 							"filename": "foo.py",
@@ -2391,7 +2391,7 @@ func TestTests(t *testing.T) {
 			packContents,
 			[]githttp.PktLineResponse{
 				{Line: "unpack ok\n", Err: nil},
-				{Line: "ng refs/heads/master tests-bad-layout: score_range for foo.py in tests/settings.json should be of length 2\n", Err: nil},
+				{Line: "ng refs/heads/master tests-bad-layout: score_range for foo.py in tests/tests.json should be of length 2\n", Err: nil},
 			},
 			ts,
 		)
@@ -2409,7 +2409,7 @@ func TestTests(t *testing.T) {
 				"cases/0.in":             strings.NewReader("1 2"),
 				"cases/0.out":            strings.NewReader("3"),
 				"statements/es.markdown": strings.NewReader("Sumas"),
-				"tests/settings.json": strings.NewReader(`{
+				"tests/tests.json": strings.NewReader(`{
 					"solutions": [
 						{
 							"filename": "foo.py",
@@ -2432,7 +2432,7 @@ func TestTests(t *testing.T) {
 			packContents,
 			[]githttp.PktLineResponse{
 				{Line: "unpack ok\n", Err: nil},
-				{Line: "ng refs/heads/master tests-bad-layout: values for score_range for foo.py in tests/settings.json should be sorted and in the interval [0, 1]\n", Err: nil},
+				{Line: "ng refs/heads/master tests-bad-layout: values for score_range for foo.py in tests/tests.json should be sorted and in the interval [0, 1]\n", Err: nil},
 			},
 			ts,
 		)
@@ -2450,7 +2450,7 @@ func TestTests(t *testing.T) {
 				"cases/0.in":             strings.NewReader("1 2"),
 				"cases/0.out":            strings.NewReader("3"),
 				"statements/es.markdown": strings.NewReader("Sumas"),
-				"tests/settings.json": strings.NewReader(`{
+				"tests/tests.json": strings.NewReader(`{
 					"solutions": [
 						{
 							"filename": "foo.py",
@@ -2474,7 +2474,7 @@ func TestTests(t *testing.T) {
 			packContents,
 			[]githttp.PktLineResponse{
 				{Line: "unpack ok\n", Err: nil},
-				{Line: "ng refs/heads/master tests-bad-layout: verdict for foo.py in tests/settings.json is not valid\n", Err: nil},
+				{Line: "ng refs/heads/master tests-bad-layout: verdict for foo.py in tests/tests.json is not valid\n", Err: nil},
 			},
 			ts,
 		)
@@ -2492,7 +2492,7 @@ func TestTests(t *testing.T) {
 				"cases/0.in":             strings.NewReader("1 2"),
 				"cases/0.out":            strings.NewReader("3"),
 				"statements/es.markdown": strings.NewReader("Sumas"),
-				"tests/settings.json": strings.NewReader(`{
+				"tests/tests.json": strings.NewReader(`{
 					"solutions": [
 						{
 							"filename": "foo.py",
