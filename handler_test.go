@@ -2310,7 +2310,47 @@ func TestTests(t *testing.T) {
 			packContents,
 			[]githttp.PktLineResponse{
 				{Line: "unpack ok\n", Err: nil},
-				{Line: "ng refs/heads/master tests-bad-layout: tests/foo.py is missing\n", Err: nil},
+				{Line: "ng refs/heads/master tests-bad-layout: tests/foo.py is missing: the path 'foo.py' does not exist in the given tree\n", Err: nil},
+			},
+			ts,
+		)
+	}
+
+	// Relative paths.
+	{
+		newOid, packContents := createCommit(
+			t,
+			tmpDir,
+			problemAlias,
+			&git.Oid{},
+			map[string]io.Reader{
+				"settings.json":          strings.NewReader(gitservertest.DefaultSettingsJSON),
+				"cases/0.in":             strings.NewReader("1 2"),
+				"cases/0.out":            strings.NewReader("3"),
+				"statements/es.markdown": strings.NewReader("Sumas"),
+				"solutions/foo.py":       strings.NewReader(""),
+				"tests/tests.json": strings.NewReader(`{
+					"solutions": [
+						{
+							"filename": "../solutions/foo.py"
+						}
+					]
+				}`),
+			},
+			"Initial commit",
+			log,
+		)
+		push(
+			t,
+			tmpDir,
+			adminAuthorization,
+			problemAlias,
+			"refs/heads/master",
+			&git.Oid{}, newOid,
+			packContents,
+			[]githttp.PktLineResponse{
+				{Line: "unpack ok\n", Err: nil},
+				{Line: "ng refs/heads/master tests-bad-layout: tests/../solutions/foo.py is missing: the path '..' does not exist in the given tree\n", Err: nil},
 			},
 			ts,
 		)
@@ -2495,13 +2535,13 @@ func TestTests(t *testing.T) {
 				"tests/tests.json": strings.NewReader(`{
 					"solutions": [
 						{
-							"filename": "foo.py",
+							"filename": "solutions/foo.py",
 							"score_range": [1, 1],
 							"verdict": "AC"
 						}
 					]
 				}`),
-				"tests/foo.py": strings.NewReader("print 1"),
+				"tests/solutions/foo.py": strings.NewReader("print 1"),
 			},
 			"Initial commit",
 			log,

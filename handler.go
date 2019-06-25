@@ -125,7 +125,7 @@ var (
 		{
 			ReferenceName: "refs/heads/protected",
 			PathRegexps: []*regexp.Regexp{
-				regexp.MustCompile("^solutions(/[^/]+\\.(markdown|gif|jpe?g|png))?$"),
+				regexp.MustCompile("^solutions(/[^/]+\\.(markdown|gif|jpe?g|png|py|cpp|c|java|kp|kj))?$"),
 				regexp.MustCompile("^tests(/.*)?$"),
 			},
 		},
@@ -615,10 +615,11 @@ func validateUpdateMaster(
 		}
 
 		for _, solutionSettings := range testsSettings.Solutions {
-			if solutionEntry := testsTree.EntryByName(solutionSettings.Filename); solutionEntry == nil {
+			if _, err := testsTree.EntryByPath(solutionSettings.Filename); err != nil {
 				return base.ErrorWithCategory(
 					ErrTestsBadLayout,
-					errors.Errorf(
+					errors.Wrapf(
+						err,
 						"tests/%s is missing",
 						solutionSettings.Filename,
 					),
