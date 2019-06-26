@@ -604,14 +604,18 @@ func validateUpdateMaster(
 		defer testSettingsJSONBlob.Free()
 
 		var testsSettings common.TestsSettings
-		if err := json.Unmarshal(testSettingsJSONBlob.Contents(), &testsSettings); err != nil {
-			return base.ErrorWithCategory(
-				ErrJSONParseError,
-				errors.Wrap(
-					err,
-					"tests/tests.json",
-				),
-			)
+		{
+			decoder := json.NewDecoder(bytes.NewReader(testSettingsJSONBlob.Contents()))
+			decoder.DisallowUnknownFields()
+			if err := decoder.Decode(&testsSettings); err != nil {
+				return base.ErrorWithCategory(
+					ErrJSONParseError,
+					errors.Wrap(
+						err,
+						"tests/tests.json",
+					),
+				)
+			}
 		}
 
 		for _, solutionSettings := range testsSettings.Solutions {

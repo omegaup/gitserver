@@ -2202,7 +2202,16 @@ func TestTests(t *testing.T) {
 			map[string]io.Reader{
 				"tests/tests.json": strings.NewReader(""),
 			},
-			"ng refs/heads/master json-parse-error: tests/tests.json: unexpected end of JSON input\n",
+			"ng refs/heads/master json-parse-error: tests/tests.json: EOF\n",
+		},
+		{
+			"Unknown fields",
+			map[string]io.Reader{
+				"tests/tests.json": strings.NewReader(`{
+					"foo": "bar"
+				}`),
+			},
+			"ng refs/heads/master json-parse-error: tests/tests.json: json: unknown field \"foo\"\n",
 		},
 		{
 			"Missing validator",
