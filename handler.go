@@ -640,32 +640,6 @@ func validateUpdateMaster(
 				)
 			}
 
-			if solutionSettings.ScoreRange != nil {
-				if len(solutionSettings.ScoreRange) != 2 ||
-					solutionSettings.ScoreRange[0] == nil ||
-					solutionSettings.ScoreRange[1] == nil {
-					return base.ErrorWithCategory(
-						ErrTestsBadLayout,
-						errors.Errorf(
-							"score_range for %s in tests/tests.json should be of length 2",
-							solutionSettings.Filename,
-						),
-					)
-				}
-
-				if (&big.Rat{}).Cmp(solutionSettings.ScoreRange[0]) > 0 ||
-					solutionSettings.ScoreRange[0].Cmp(solutionSettings.ScoreRange[1]) > 0 ||
-					solutionSettings.ScoreRange[1].Cmp(big.NewRat(1, 1)) > 0 {
-					return base.ErrorWithCategory(
-						ErrTestsBadLayout,
-						errors.Errorf(
-							"values for score_range for %s in tests/tests.json should be sorted and in the interval [0, 1]",
-							solutionSettings.Filename,
-						),
-					)
-				}
-			}
-
 			if solutionSettings.Verdict != "" {
 				foundVerdict := false
 				for _, verdict := range common.VerdictList {
@@ -683,6 +657,19 @@ func validateUpdateMaster(
 						),
 					)
 				}
+			}
+		}
+
+		if testsSettings.InputsValidator != nil {
+			if _, err := testsTree.EntryByPath(testsSettings.InputsValidator.Filename); err != nil {
+				return base.ErrorWithCategory(
+					ErrTestsBadLayout,
+					errors.Wrapf(
+						err,
+						"tests/%s is missing",
+						testsSettings.InputsValidator.Filename,
+					),
+				)
 			}
 		}
 	}

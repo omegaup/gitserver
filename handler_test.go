@@ -2266,7 +2266,7 @@ func TestTests(t *testing.T) {
 				}`),
 				"tests/foo.py": strings.NewReader("print 1"),
 			},
-			"ng refs/heads/master tests-bad-layout: score_range for foo.py in tests/tests.json should be of length 2\n",
+			"ng refs/heads/master json-parse-error: tests/tests.json: score_range should be an array with two numbers\n",
 		},
 		{
 			"Bad score_range",
@@ -2281,7 +2281,7 @@ func TestTests(t *testing.T) {
 				}`),
 				"tests/foo.py": strings.NewReader("print 1"),
 			},
-			"ng refs/heads/master tests-bad-layout: values for score_range for foo.py in tests/tests.json should be sorted and in the interval [0, 1]\n",
+			"ng refs/heads/master json-parse-error: tests/tests.json: values for score_range should be in the interval [0, 1]\n",
 		},
 		{
 			"Bad verdict",
@@ -2298,6 +2298,24 @@ func TestTests(t *testing.T) {
 				"tests/foo.py": strings.NewReader("print 1"),
 			},
 			"ng refs/heads/master tests-bad-layout: verdict for foo.py in tests/tests.json is not valid\n",
+		},
+		{
+			"Bad validator",
+			map[string]io.Reader{
+				"tests/tests.json": strings.NewReader(`{
+					"solutions": [
+						{
+							"filename": "solutions/foo.py",
+							"verdict": "AC"
+						}
+					],
+					"inputs": {
+						"filename": "test-validator.py"
+					}
+				}`),
+				"tests/solutions/foo.py": strings.NewReader("print 1"),
+			},
+			"ng refs/heads/master tests-bad-layout: tests/test-validator.py is missing: the path 'test-validator.py' does not exist in the given tree\n",
 		},
 		{
 			"Valid",
