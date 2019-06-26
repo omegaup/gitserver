@@ -2178,117 +2178,35 @@ func TestTests(t *testing.T) {
 	}
 	defer repo.Free()
 
-	// tests is not a directory.
-	{
-		newOid, packContents := createCommit(
-			t,
-			tmpDir,
-			problemAlias,
-			&git.Oid{},
+	for idx, testcase := range []struct {
+		name          string
+		extraContents map[string]io.Reader
+		status        string
+	}{
+		{
+			"tests is not a directory",
 			map[string]io.Reader{
-				"settings.json":          strings.NewReader(gitservertest.DefaultSettingsJSON),
-				"cases/0.in":             strings.NewReader("1 2"),
-				"cases/0.out":            strings.NewReader("3"),
-				"statements/es.markdown": strings.NewReader("Sumas"),
-				"tests":                  strings.NewReader(""),
+				"tests": strings.NewReader(""),
 			},
-			"Initial commit",
-			log,
-		)
-		push(
-			t,
-			tmpDir,
-			adminAuthorization,
-			problemAlias,
-			"refs/heads/master",
-			&git.Oid{}, newOid,
-			packContents,
-			[]githttp.PktLineResponse{
-				{Line: "unpack ok\n", Err: nil},
-				{Line: "ng refs/heads/master tests-bad-layout: tests/ directory is not a tree\n", Err: nil},
-			},
-			ts,
-		)
-	}
-
-	// Missing tests/tests.json
-	{
-		newOid, packContents := createCommit(
-			t,
-			tmpDir,
-			problemAlias,
-			&git.Oid{},
+			"ng refs/heads/master tests-bad-layout: tests/ directory is not a tree\n",
+		},
+		{
+			"Missing tests/tests.json",
 			map[string]io.Reader{
-				"settings.json":          strings.NewReader(gitservertest.DefaultSettingsJSON),
-				"cases/0.in":             strings.NewReader("1 2"),
-				"cases/0.out":            strings.NewReader("3"),
-				"statements/es.markdown": strings.NewReader("Sumas"),
-				"tests/foo":              strings.NewReader(""),
+				"tests/foo": strings.NewReader(""),
 			},
-			"Initial commit",
-			log,
-		)
-		push(
-			t,
-			tmpDir,
-			adminAuthorization,
-			problemAlias,
-			"refs/heads/master",
-			&git.Oid{}, newOid,
-			packContents,
-			[]githttp.PktLineResponse{
-				{Line: "unpack ok\n", Err: nil},
-				{Line: "ng refs/heads/master tests-bad-layout: tests/tests.json is missing\n", Err: nil},
-			},
-			ts,
-		)
-	}
-
-	// Corrupt settings.json
-	{
-		newOid, packContents := createCommit(
-			t,
-			tmpDir,
-			problemAlias,
-			&git.Oid{},
+			"ng refs/heads/master tests-bad-layout: tests/tests.json is missing\n",
+		},
+		{
+			"Corrupt settings.json",
 			map[string]io.Reader{
-				"settings.json":          strings.NewReader(gitservertest.DefaultSettingsJSON),
-				"cases/0.in":             strings.NewReader("1 2"),
-				"cases/0.out":            strings.NewReader("3"),
-				"statements/es.markdown": strings.NewReader("Sumas"),
-				"tests/tests.json":       strings.NewReader(""),
+				"tests/tests.json": strings.NewReader(""),
 			},
-			"Initial commit",
-			log,
-		)
-		push(
-			t,
-			tmpDir,
-			adminAuthorization,
-			problemAlias,
-			"refs/heads/master",
-			&git.Oid{}, newOid,
-			packContents,
-			[]githttp.PktLineResponse{
-				{Line: "unpack ok\n", Err: nil},
-				{Line: "ng refs/heads/master json-parse-error: tests/tests.json: unexpected end of JSON input\n", Err: nil},
-			},
-			ts,
-		)
-	}
-
-	// Missing validator.
-	{
-		newOid, packContents := createCommit(
-			t,
-			tmpDir,
-			problemAlias,
-			&git.Oid{},
+			"ng refs/heads/master json-parse-error: tests/tests.json: unexpected end of JSON input\n",
+		},
+		{
+			"Missing validator",
 			map[string]io.Reader{
-				"settings.json":          strings.NewReader(gitservertest.DefaultSettingsJSON),
-				"cases/0.in":             strings.NewReader("1 2"),
-				"cases/0.out":            strings.NewReader("3"),
-				"statements/es.markdown": strings.NewReader("Sumas"),
 				"tests/tests.json": strings.NewReader(`{
 					"solutions": [
 						{
@@ -2297,38 +2215,11 @@ func TestTests(t *testing.T) {
 					]
 				}`),
 			},
-			"Initial commit",
-			log,
-		)
-		push(
-			t,
-			tmpDir,
-			adminAuthorization,
-			problemAlias,
-			"refs/heads/master",
-			&git.Oid{}, newOid,
-			packContents,
-			[]githttp.PktLineResponse{
-				{Line: "unpack ok\n", Err: nil},
-				{Line: "ng refs/heads/master tests-bad-layout: tests/foo.py is missing: the path 'foo.py' does not exist in the given tree\n", Err: nil},
-			},
-			ts,
-		)
-	}
-
-	// Relative paths.
-	{
-		newOid, packContents := createCommit(
-			t,
-			tmpDir,
-			problemAlias,
-			&git.Oid{},
+			"ng refs/heads/master tests-bad-layout: tests/foo.py is missing: the path 'foo.py' does not exist in the given tree\n",
+		},
+		{
+			"Relative paths",
 			map[string]io.Reader{
-				"settings.json":          strings.NewReader(gitservertest.DefaultSettingsJSON),
-				"cases/0.in":             strings.NewReader("1 2"),
-				"cases/0.out":            strings.NewReader("3"),
-				"statements/es.markdown": strings.NewReader("Sumas"),
-				"solutions/foo.py":       strings.NewReader(""),
 				"tests/tests.json": strings.NewReader(`{
 					"solutions": [
 						{
@@ -2337,37 +2228,11 @@ func TestTests(t *testing.T) {
 					]
 				}`),
 			},
-			"Initial commit",
-			log,
-		)
-		push(
-			t,
-			tmpDir,
-			adminAuthorization,
-			problemAlias,
-			"refs/heads/master",
-			&git.Oid{}, newOid,
-			packContents,
-			[]githttp.PktLineResponse{
-				{Line: "unpack ok\n", Err: nil},
-				{Line: "ng refs/heads/master tests-bad-layout: tests/../solutions/foo.py is missing: the path '..' does not exist in the given tree\n", Err: nil},
-			},
-			ts,
-		)
-	}
-
-	// Missing score_range and verdict
-	{
-		newOid, packContents := createCommit(
-			t,
-			tmpDir,
-			problemAlias,
-			&git.Oid{},
+			"ng refs/heads/master tests-bad-layout: tests/../solutions/foo.py is missing: the path '..' does not exist in the given tree\n",
+		},
+		{
+			"Missing score_range and verdict",
 			map[string]io.Reader{
-				"settings.json":          strings.NewReader(gitservertest.DefaultSettingsJSON),
-				"cases/0.in":             strings.NewReader("1 2"),
-				"cases/0.out":            strings.NewReader("3"),
-				"statements/es.markdown": strings.NewReader("Sumas"),
 				"tests/tests.json": strings.NewReader(`{
 					"solutions": [
 						{
@@ -2377,37 +2242,11 @@ func TestTests(t *testing.T) {
 				}`),
 				"tests/foo.py": strings.NewReader("print 1"),
 			},
-			"Initial commit",
-			log,
-		)
-		push(
-			t,
-			tmpDir,
-			adminAuthorization,
-			problemAlias,
-			"refs/heads/master",
-			&git.Oid{}, newOid,
-			packContents,
-			[]githttp.PktLineResponse{
-				{Line: "unpack ok\n", Err: nil},
-				{Line: "ng refs/heads/master tests-bad-layout: score_range or validator for foo.py in tests/tests.json should be set\n", Err: nil},
-			},
-			ts,
-		)
-	}
-
-	// Missing score_range.
-	{
-		newOid, packContents := createCommit(
-			t,
-			tmpDir,
-			problemAlias,
-			&git.Oid{},
+			"ng refs/heads/master tests-bad-layout: score_range or validator for foo.py in tests/tests.json should be set\n",
+		},
+		{
+			"Missing score_range",
 			map[string]io.Reader{
-				"settings.json":          strings.NewReader(gitservertest.DefaultSettingsJSON),
-				"cases/0.in":             strings.NewReader("1 2"),
-				"cases/0.out":            strings.NewReader("3"),
-				"statements/es.markdown": strings.NewReader("Sumas"),
 				"tests/tests.json": strings.NewReader(`{
 					"solutions": [
 						{
@@ -2418,37 +2257,11 @@ func TestTests(t *testing.T) {
 				}`),
 				"tests/foo.py": strings.NewReader("print 1"),
 			},
-			"Initial commit",
-			log,
-		)
-		push(
-			t,
-			tmpDir,
-			adminAuthorization,
-			problemAlias,
-			"refs/heads/master",
-			&git.Oid{}, newOid,
-			packContents,
-			[]githttp.PktLineResponse{
-				{Line: "unpack ok\n", Err: nil},
-				{Line: "ng refs/heads/master tests-bad-layout: score_range for foo.py in tests/tests.json should be of length 2\n", Err: nil},
-			},
-			ts,
-		)
-	}
-
-	// Bad score_range.
-	{
-		newOid, packContents := createCommit(
-			t,
-			tmpDir,
-			problemAlias,
-			&git.Oid{},
+			"ng refs/heads/master tests-bad-layout: score_range for foo.py in tests/tests.json should be of length 2\n",
+		},
+		{
+			"Bad score_range",
 			map[string]io.Reader{
-				"settings.json":          strings.NewReader(gitservertest.DefaultSettingsJSON),
-				"cases/0.in":             strings.NewReader("1 2"),
-				"cases/0.out":            strings.NewReader("3"),
-				"statements/es.markdown": strings.NewReader("Sumas"),
 				"tests/tests.json": strings.NewReader(`{
 					"solutions": [
 						{
@@ -2459,37 +2272,11 @@ func TestTests(t *testing.T) {
 				}`),
 				"tests/foo.py": strings.NewReader("print 1"),
 			},
-			"Initial commit",
-			log,
-		)
-		push(
-			t,
-			tmpDir,
-			adminAuthorization,
-			problemAlias,
-			"refs/heads/master",
-			&git.Oid{}, newOid,
-			packContents,
-			[]githttp.PktLineResponse{
-				{Line: "unpack ok\n", Err: nil},
-				{Line: "ng refs/heads/master tests-bad-layout: values for score_range for foo.py in tests/tests.json should be sorted and in the interval [0, 1]\n", Err: nil},
-			},
-			ts,
-		)
-	}
-
-	// Bad verdict
-	{
-		newOid, packContents := createCommit(
-			t,
-			tmpDir,
-			problemAlias,
-			&git.Oid{},
+			"ng refs/heads/master tests-bad-layout: values for score_range for foo.py in tests/tests.json should be sorted and in the interval [0, 1]\n",
+		},
+		{
+			"Bad verdict",
 			map[string]io.Reader{
-				"settings.json":          strings.NewReader(gitservertest.DefaultSettingsJSON),
-				"cases/0.in":             strings.NewReader("1 2"),
-				"cases/0.out":            strings.NewReader("3"),
-				"statements/es.markdown": strings.NewReader("Sumas"),
 				"tests/tests.json": strings.NewReader(`{
 					"solutions": [
 						{
@@ -2501,37 +2288,11 @@ func TestTests(t *testing.T) {
 				}`),
 				"tests/foo.py": strings.NewReader("print 1"),
 			},
-			"Initial commit",
-			log,
-		)
-		push(
-			t,
-			tmpDir,
-			adminAuthorization,
-			problemAlias,
-			"refs/heads/master",
-			&git.Oid{}, newOid,
-			packContents,
-			[]githttp.PktLineResponse{
-				{Line: "unpack ok\n", Err: nil},
-				{Line: "ng refs/heads/master tests-bad-layout: verdict for foo.py in tests/tests.json is not valid\n", Err: nil},
-			},
-			ts,
-		)
-	}
-
-	// Valid
-	{
-		newOid, packContents := createCommit(
-			t,
-			tmpDir,
-			problemAlias,
-			&git.Oid{},
+			"ng refs/heads/master tests-bad-layout: verdict for foo.py in tests/tests.json is not valid\n",
+		},
+		{
+			"Valid",
 			map[string]io.Reader{
-				"settings.json":          strings.NewReader(gitservertest.DefaultSettingsJSON),
-				"cases/0.in":             strings.NewReader("1 2"),
-				"cases/0.out":            strings.NewReader("3"),
-				"statements/es.markdown": strings.NewReader("Sumas"),
 				"tests/tests.json": strings.NewReader(`{
 					"solutions": [
 						{
@@ -2543,22 +2304,42 @@ func TestTests(t *testing.T) {
 				}`),
 				"tests/solutions/foo.py": strings.NewReader("print 1"),
 			},
-			"Initial commit",
-			log,
-		)
-		push(
-			t,
-			tmpDir,
-			adminAuthorization,
-			problemAlias,
-			"refs/heads/master",
-			&git.Oid{}, newOid,
-			packContents,
-			[]githttp.PktLineResponse{
-				{Line: "unpack ok\n", Err: nil},
-				{Line: "ok refs/heads/master\n", Err: nil},
-			},
-			ts,
-		)
+			"ok refs/heads/master\n",
+		},
+	} {
+		t.Run(fmt.Sprintf("%d %s", idx, testcase.name), func(t *testing.T) {
+			contents := map[string]io.Reader{
+				"settings.json":          strings.NewReader(gitservertest.DefaultSettingsJSON),
+				"cases/0.in":             strings.NewReader("1 2"),
+				"cases/0.out":            strings.NewReader("3"),
+				"statements/es.markdown": strings.NewReader("Sumas"),
+			}
+			for name, r := range testcase.extraContents {
+				contents[name] = r
+			}
+			newOid, packContents := createCommit(
+				t,
+				tmpDir,
+				problemAlias,
+				&git.Oid{},
+				contents,
+				"Initial commit",
+				log,
+			)
+			push(
+				t,
+				tmpDir,
+				adminAuthorization,
+				problemAlias,
+				"refs/heads/master",
+				&git.Oid{}, newOid,
+				packContents,
+				[]githttp.PktLineResponse{
+					{Line: "unpack ok\n", Err: nil},
+					{Line: testcase.status, Err: nil},
+				},
+				ts,
+			)
+		})
 	}
 }
