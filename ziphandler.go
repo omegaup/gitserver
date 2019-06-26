@@ -1321,19 +1321,19 @@ func PushZip(
 				publishedUpdatedRef.From = publishedBranch.Target().String()
 				publishedBranch.Free()
 			}
-			if ref, err := repo.References.Create(
+			ref, err := repo.References.Create(
 				publishedUpdatedRef.Name,
 				masterNewOid,
 				true,
 				"",
-			); err != nil {
+			)
+			if err != nil {
 				return nil, errors.Wrap(
 					err,
 					"failed to update the published ref",
 				)
-			} else {
-				ref.Free()
 			}
+			ref.Free()
 			updatedRefs = append(updatedRefs, publishedUpdatedRef)
 		}
 	}

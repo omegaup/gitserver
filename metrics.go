@@ -36,6 +36,7 @@ func (p *prometheusMetrics) SummaryObserve(name string, value float64) {
 	}
 }
 
+// SetupMetrics sets up the metrics for the gitserver.
 func SetupMetrics() (base.Metrics, http.Handler) {
 	for _, gauge := range gauges {
 		prometheus.MustRegister(gauge)
