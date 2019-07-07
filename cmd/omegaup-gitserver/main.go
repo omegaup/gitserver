@@ -46,16 +46,10 @@ type bearerAuthorization struct {
 	publicKey ed25519.PublicKey
 }
 
-func (a *bearerAuthorization) parseBearerAuth(auth string) (username, problem string, ok bool) {
-	const prefix = "Bearer "
-	// Case insensitive prefix match. See Issue 22736.
-	if len(auth) < len(prefix) || !strings.EqualFold(auth[:len(prefix)], prefix) {
-		return
-	}
-
+func (a *bearerAuthorization) parseBearerToken(token string) (username, problem string, ok bool) {
 	var jsonToken paseto.JSONToken
 	var footer string
-	if err := paseto.NewV2().Verify(auth[len(prefix):], a.publicKey, &jsonToken, &footer); err != nil {
+	if err := paseto.NewV2().Verify(token, a.publicKey, &jsonToken, &footer); err != nil {
 		a.log.Error("failed to verify token", "err", err)
 		return
 	}
@@ -71,6 +65,16 @@ func (a *bearerAuthorization) parseBearerAuth(auth string) (username, problem st
 	return
 }
 
+func (a *bearerAuthorization) extractBearerToken(auth string) (token string, ok bool) {
+	const prefix = "Bearer "
+	// Case insensitive prefix match. See Issue 22736.
+	if len(auth) < len(prefix) || !strings.EqualFold(auth[:len(prefix)], prefix) {
+		return "", false
+	}
+
+	return auth[len(prefix):], true
+}
+
 func (a *bearerAuthorization) authorize(
 	ctx context.Context,
 	w http.ResponseWriter,
@@ -78,12 +82,27 @@ func (a *bearerAuthorization) authorize(
 	repositoryName string,
 	operation githttp.GitOperation,
 ) (githttp.AuthorizationLevel, string) {
-	username, problem, ok := a.parseBearerAuth(r.Header.Get("Authorization"))
+	basicAuthUsername, token, ok := r.BasicAuth()
 	if !ok {
-		w.Header().Set("WWW-Authenticate", "Bearer realm=\"omegaUp gitserver\"")
+		token, ok = a.extractBearerToken(r.Header.Get("Authorization"))
+	}
+	var username, problem string
+	if ok {
+		username, problem, ok = a.parseBearerToken(token)
+	}
+	if basicAuthUsername != "" && basicAuthUsername != username {
+		// If Basic authentication was attempted, verify that the token actually corresponds to the user.
+		ok = false
+	}
+	if !ok {
+		w.Header().Set(
+			"WWW-Authenticate",
+			"Basic realm=\"omegaUp gitserver\", Bearer realm=\"omegaUp gitserver\"",
+		)
 		w.WriteHeader(http.StatusUnauthorized)
 		return githttp.AuthorizationDenied, ""
 	}
+
 	if problem != repositoryName {
 		w.WriteHeader(http.StatusForbidden)
 		return githttp.AuthorizationDenied, ""
@@ -134,9 +153,15 @@ func (a *secretTokenAuthorization) authorize(
 	repositoryName string,
 	operation githttp.GitOperation,
 ) (githttp.AuthorizationLevel, string) {
-	username, ok := a.parseSecretTokenAuth(r.Header.Get("Authorization"))
+	username, password, ok := r.BasicAuth()
+	if !ok || !strings.EqualFold(password, a.secretToken) {
+		username, ok = a.parseSecretTokenAuth(r.Header.Get("Authorization"))
+	}
 	if !ok {
-		w.Header().Set("WWW-Authenticate", "Bearer realm=\"omegaUp gitserver\"")
+		w.Header().Set(
+			"WWW-Authenticate",
+			"Basic realm=\"omegaUp gitserver\", Bearer realm=\"omegaUp gitserver\"",
+		)
 		w.WriteHeader(http.StatusUnauthorized)
 		return githttp.AuthorizationDenied, ""
 	}
