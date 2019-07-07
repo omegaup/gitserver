@@ -2,7 +2,6 @@ package main
 
 import (
 	"encoding/base64"
-	"fmt"
 	base "github.com/omegaup/go-base"
 	"golang.org/x/crypto/ed25519"
 	"testing"
@@ -23,7 +22,7 @@ func TestParseBearerAuth(t *testing.T) {
 		publicKey: ed25519.PublicKey(keyBytes),
 	}
 
-	_, _, ok := auth.parseBearerAuth(fmt.Sprintf("Bearer %s", expiredToken))
+	_, _, ok := auth.parseBearerToken(expiredToken)
 	if ok {
 		t.Errorf("expired token was passed as valid")
 	}
