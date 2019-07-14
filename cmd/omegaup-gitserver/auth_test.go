@@ -17,7 +17,7 @@ func TestParseBearerAuth(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to parse shared key: %v", err)
 	}
-	auth := bearerAuthorization{
+	auth := omegaupAuthorization{
 		log:       log,
 		publicKey: ed25519.PublicKey(keyBytes),
 	}

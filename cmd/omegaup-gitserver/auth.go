@@ -8,19 +8,26 @@ import (
 	"github.com/o1egl/paseto"
 	"github.com/omegaup/githttp"
 	"github.com/omegaup/gitserver/request"
-	errors "github.com/pkg/errors"
+	"github.com/pkg/errors"
 	"golang.org/x/crypto/ed25519"
 	"net/http"
 	"strings"
 	"time"
 )
 
-type bearerAuthorization struct {
-	log       log15.Logger
-	publicKey ed25519.PublicKey
+const (
+	basicAuthenticationScheme               = "Basic"
+	bearerAuthenticationScheme              = "Bearer"
+	omegaUpSharedSecretAuthenticationScheme = "OmegaUpSharedSecret"
+)
+
+type omegaupAuthorization struct {
+	log         log15.Logger
+	publicKey   ed25519.PublicKey
+	secretToken string
 }
 
-func (a *bearerAuthorization) parseBearerToken(token string) (username, problem string, ok bool) {
+func (a *omegaupAuthorization) parseBearerToken(token string) (username, problem string, ok bool) {
 	var jsonToken paseto.JSONToken
 	var footer string
 	if err := paseto.NewV2().Verify(token, a.publicKey, &jsonToken, &footer); err != nil {
@@ -39,110 +46,106 @@ func (a *bearerAuthorization) parseBearerToken(token string) (username, problem 
 	return
 }
 
-func (a *bearerAuthorization) extractBearerToken(auth string) (token string, ok bool) {
-	const prefix = "Bearer "
-	// Case insensitive prefix match. See Issue 22736.
-	if len(auth) < len(prefix) || !strings.EqualFold(auth[:len(prefix)], prefix) {
-		return "", false
+func (a *omegaupAuthorization) parseUsernameAndPassword(
+	basicAuthUsername string,
+	password string,
+	repositoryName string,
+) (username, problem string, ok bool) {
+	if a.publicKey != nil && strings.HasPrefix(password, "v2.public.") {
+		username, problem, ok = a.parseBearerToken(password)
+		if ok {
+			return
+		}
 	}
 
-	return auth[len(prefix):], true
+	if a.secretToken != "" && password == a.secretToken {
+		username = basicAuthUsername
+		problem = repositoryName
+		ok = true
+	}
+
+	return
 }
 
-func (a *bearerAuthorization) authorize(
+func (a *omegaupAuthorization) parseAuthorizationHeader(
+	authorizationHeader string,
+	repositoryName string,
+) (username, problem string, ok bool) {
+	tokens := strings.SplitN(authorizationHeader, " ", 3)
+
+	if a.publicKey != nil {
+		if strings.EqualFold(tokens[0], bearerAuthenticationScheme) {
+			if len(tokens) != 2 {
+				return
+			}
+
+			return a.parseBearerToken(tokens[1])
+		}
+	}
+
+	if a.secretToken != "" {
+		if strings.EqualFold(tokens[0], omegaUpSharedSecretAuthenticationScheme) {
+			if len(tokens) != 3 {
+				return
+			}
+
+			if tokens[1] != a.secretToken {
+				return
+			}
+
+			username = tokens[2]
+			problem = repositoryName
+			ok = true
+		}
+	}
+
+	return
+}
+
+func (a *omegaupAuthorization) authorize(
 	ctx context.Context,
 	w http.ResponseWriter,
 	r *http.Request,
 	repositoryName string,
 	operation githttp.GitOperation,
 ) (githttp.AuthorizationLevel, string) {
-	basicAuthUsername, token, ok := r.BasicAuth()
-	if !ok {
-		token, ok = a.extractBearerToken(r.Header.Get("Authorization"))
-	}
+	basicAuthUsername, password, ok := r.BasicAuth()
 	var username, problem string
 	if ok {
-		username, problem, ok = a.parseBearerToken(token)
+		username, problem, ok = a.parseUsernameAndPassword(basicAuthUsername, password, repositoryName)
 	}
+	if !ok {
+		username, problem, ok = a.parseAuthorizationHeader(r.Header.Get("Authorization"), repositoryName)
+	}
+
 	if basicAuthUsername != "" && basicAuthUsername != username {
 		// If Basic authentication was attempted, verify that the token actually corresponds to the user.
 		ok = false
 	}
 	if !ok {
-		w.Header().Set(
-			"WWW-Authenticate",
-			fmt.Sprintf(
-				"Basic realm=%[1]q, Bearer realm=%[1]q",
-				fmt.Sprintf("omegaUp gitserver problem %q", repositoryName),
-			),
-		)
+		realm := fmt.Sprintf("omegaUp gitserver problem %q", repositoryName)
+		authenticationSchemes := []string{
+			fmt.Sprintf("%s realm=%q", basicAuthenticationScheme, realm),
+		}
+		if a.publicKey != nil {
+			authenticationSchemes = append(
+				authenticationSchemes,
+				fmt.Sprintf("%s realm=%q", bearerAuthenticationScheme, realm),
+			)
+		}
+		if a.secretToken != "" {
+			authenticationSchemes = append(
+				authenticationSchemes,
+				fmt.Sprintf("%s realm=%q", omegaUpSharedSecretAuthenticationScheme, realm),
+			)
+		}
+		w.Header().Set("WWW-Authenticate", strings.Join(authenticationSchemes, ", "))
 		w.WriteHeader(http.StatusUnauthorized)
 		return githttp.AuthorizationDenied, ""
 	}
 
 	if problem != repositoryName {
 		w.WriteHeader(http.StatusForbidden)
-		return githttp.AuthorizationDenied, ""
-	}
-
-	log.Info(
-		"Auth",
-		"username", username,
-		"problem", problem,
-		"repository", repositoryName,
-		"operation", operation,
-	)
-	requestContext := request.FromContext(ctx)
-	// Right now only the frontend can issue requests, so we trust it completely.
-	requestContext.CanView = true
-	requestContext.IsAdmin = true
-	requestContext.CanEdit = true
-	return githttp.AuthorizationAllowed, username
-}
-
-type secretTokenAuthorization struct {
-	log         log15.Logger
-	secretToken string
-}
-
-func (a *secretTokenAuthorization) parseSecretTokenAuth(auth string) (username string, ok bool) {
-	tokens := strings.SplitN(auth, " ", 3)
-	if len(tokens) != 3 {
-		return
-	}
-
-	if !strings.EqualFold(tokens[0], "Bearer") && !strings.EqualFold(tokens[0], "OmegaUpSharedSecret") {
-		return
-	}
-	if tokens[1] != a.secretToken {
-		return
-	}
-
-	username = tokens[2]
-	ok = true
-	return
-}
-
-func (a *secretTokenAuthorization) authorize(
-	ctx context.Context,
-	w http.ResponseWriter,
-	r *http.Request,
-	repositoryName string,
-	operation githttp.GitOperation,
-) (githttp.AuthorizationLevel, string) {
-	username, password, ok := r.BasicAuth()
-	if !ok || !strings.EqualFold(password, a.secretToken) {
-		username, ok = a.parseSecretTokenAuth(r.Header.Get("Authorization"))
-	}
-	if !ok {
-		w.Header().Set(
-			"WWW-Authenticate",
-			fmt.Sprintf(
-				"Basic realm=%[1]q, Bearer realm=%[1]q, OmegaUpSharedSecret realm=%[1]q",
-				fmt.Sprintf("omegaUp gitserver problem %q", repositoryName),
-			),
-		)
-		w.WriteHeader(http.StatusUnauthorized)
 		return githttp.AuthorizationDenied, ""
 	}
 
@@ -161,22 +164,21 @@ func (a *secretTokenAuthorization) authorize(
 }
 
 func createAuthorizationCallback(config *Config, log log15.Logger) (githttp.AuthorizationCallback, error) {
-	if config.Gitserver.PublicKey == "" && config.Gitserver.SecretToken != "" {
-		log.Warn("using insecure secret token authorization")
-		auth := secretTokenAuthorization{
-			log:         log,
-			secretToken: config.Gitserver.SecretToken,
-		}
-		return auth.authorize, nil
-	}
-	keyBytes, err := base64.StdEncoding.DecodeString(config.Gitserver.PublicKey)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to parse the base64-encoded public key")
+	auth := omegaupAuthorization{
+		log: log,
 	}
 
-	auth := bearerAuthorization{
-		log:       log,
-		publicKey: ed25519.PublicKey(keyBytes),
+	if config.Gitserver.SecretToken != "" {
+		log.Warn("using insecure secret token authorization")
+		auth.secretToken = config.Gitserver.SecretToken
+	}
+	if config.Gitserver.PublicKey != "" {
+		keyBytes, err := base64.StdEncoding.DecodeString(config.Gitserver.PublicKey)
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to parse the base64-encoded public key")
+		}
+
+		auth.publicKey = ed25519.PublicKey(keyBytes)
 	}
 	return auth.authorize, nil
 }
