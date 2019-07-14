@@ -13,7 +13,7 @@ const (
 
 func TestParseBearerAuth(t *testing.T) {
 	log := base.StderrLog()
-	keyBytes, err := base64.StdEncoding.DecodeString(DefaultConfig().Gitserver.PublicKeyBase64)
+	keyBytes, err := base64.StdEncoding.DecodeString(DefaultConfig().Gitserver.PublicKey)
 	if err != nil {
 		t.Fatalf("failed to parse shared key: %v", err)
 	}
