@@ -188,8 +188,8 @@ type PublishingConfig struct {
 	Branch     string `json:"branch,omitempty"`
 }
 
-// Config represents the contents of config.json in refs/meta/config.
-type Config struct {
+// MetaConfig represents the contents of config.json in refs/meta/config.
+type MetaConfig struct {
 	Publishing PublishingConfig `json:"publishing"`
 }
 
@@ -1026,8 +1026,8 @@ func (p *gitProtocol) validateUpdateConfig(repository *git.Repository, oldCommit
 	contents := configBlob.Contents()
 	configBlob.Free()
 
-	var config Config
-	if err := json.Unmarshal([]byte(contents), &config); err != nil {
+	var metaConfig MetaConfig
+	if err := json.Unmarshal([]byte(contents), &metaConfig); err != nil {
 		return base.ErrorWithCategory(
 			ErrJSONParseError,
 			errors.Wrap(
@@ -1036,16 +1036,16 @@ func (p *gitProtocol) validateUpdateConfig(repository *git.Repository, oldCommit
 			),
 		)
 	}
-	if config.Publishing.Mode == "mirror" {
+	if metaConfig.Publishing.Mode == "mirror" {
 		// No additional checks needed.
-	} else if config.Publishing.Mode == "subdirectory" {
-		if config.Publishing.Target == "" {
+	} else if metaConfig.Publishing.Mode == "subdirectory" {
+		if metaConfig.Publishing.Target == "" {
 			return ErrConfigSubdirectoryMissingTarget
 		}
 	} else {
 		return ErrConfigInvalidPublishingMode
 	}
-	if parsed, err := url.Parse(config.Publishing.Repository); err != nil || !parsed.IsAbs() {
+	if parsed, err := url.Parse(metaConfig.Publishing.Repository); err != nil || !parsed.IsAbs() {
 		return ErrConfigRepositoryNotAbsoluteURL
 	}
 	return nil
@@ -1689,7 +1689,7 @@ func InitRepository(
 	}
 
 	// Disable delta.
-	config, err := repo.Config()
+	repoConfig, err := repo.Config()
 	if err != nil {
 		return nil, base.ErrorWithCategory(
 			ErrInternalGit,
@@ -1700,9 +1700,9 @@ func InitRepository(
 			),
 		)
 	}
-	defer config.Free()
+	defer repoConfig.Free()
 
-	if err := config.SetInt32("pack.deltaCacheSize", 0); err != nil {
+	if err := repoConfig.SetInt32("pack.deltaCacheSize", 0); err != nil {
 		return nil, base.ErrorWithCategory(
 			ErrInternalGit,
 			errors.Wrapf(

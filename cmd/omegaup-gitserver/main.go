@@ -25,17 +25,13 @@ import (
 )
 
 var (
-	rootPath                = flag.String("root", "", "Root path of all repositories")
-	publicKeyBase64         = flag.String("public-key", "gKEg5JlIOA1BsIxETZYhjd+ZGchY/rZeQM0GheAWvXw=", "Public key of the omegaUp frontend")
-	secretToken             = flag.String("secret-token", "", "A secret token to use instead of resorting to PKI for speeding up tests")
-	port                    = flag.Int("port", 33861, "Port in which the server will listen")
-	pprofPort               = flag.Int("pprof-port", 33862, "Port in which the pprof server will listen")
-	libinteractivePath      = flag.String("libinteractive-path", "/usr/share/java/libinteractive.jar", "Path of libinteractive.jar")
-	allowDirectPushToMaster = flag.Bool("allow-direct-push-to-master", false, "Allow direct push to master")
-	logFile                 = flag.String("log-file", "", "Redirect logs to file")
-	verbose                 = flag.Bool("verbose", false, "Verbose logging")
-	version                 = flag.Bool("version", false, "Print the version and exit")
-	log                     log15.Logger
+	configPath = flag.String(
+		"config",
+		"/etc/omegaup/gitserver/config.json",
+		"gitserver configuration file",
+	)
+	version = flag.Bool("version", false, "Print the version and exit")
+	log     log15.Logger
 
 	// ProgramVersion is the version of the code from which the binary was built from.
 	ProgramVersion string
@@ -240,35 +236,46 @@ func main() {
 		return
 	}
 
-	if *logFile != "" {
-		logLevel := "info"
-		if *verbose {
-			logLevel = "debug"
-		}
+	f, err := os.Open(*configPath)
+	if err != nil {
+		panic(err)
+	}
+	config, err := NewConfig(f)
+	if err != nil {
+		panic(err)
+	}
+	f.Close()
+
+	if config.Logging.File != "" {
 		var err error
-		if log, err = base.RotatingLog(*logFile, logLevel); err != nil {
+		if log, err = base.RotatingLog(config.Logging.File, config.Logging.Level); err != nil {
 			panic(err)
 		}
-	} else if *verbose {
+	} else if config.Logging.Level == "debug" {
 		log = base.StderrLog()
 	} else {
 		log = log15.New()
 		log.SetHandler(base.ErrorCallerStackHandler(log15.LvlInfo, log15.StderrHandler))
 	}
 
+	if config.Gitserver.RootPath == "" {
+		log.Error("root path cannot be empty. Please specify one with -root")
+		os.Exit(1)
+	}
+
 	stopChan := make(chan os.Signal)
 	signal.Notify(stopChan, syscall.SIGINT, syscall.SIGTERM)
 
 	var authCallback githttp.AuthorizationCallback
-	if *publicKeyBase64 == "" && *secretToken != "" {
+	if config.Gitserver.PublicKeyBase64 == "" && config.Gitserver.SecretToken != "" {
 		log.Warn("using insecure secret token authorization")
 		auth := secretTokenAuthorization{
 			log:         log,
-			secretToken: *secretToken,
+			secretToken: config.Gitserver.SecretToken,
 		}
 		authCallback = auth.authorize
 	} else {
-		keyBytes, err := base64.StdEncoding.DecodeString(*publicKeyBase64)
+		keyBytes, err := base64.StdEncoding.DecodeString(config.Gitserver.PublicKeyBase64)
 		if err != nil {
 			log.Error("failed to parse the base64-encoded public key", "err", err)
 			os.Exit(1)
@@ -284,25 +291,20 @@ func main() {
 	protocol := gitserver.NewGitProtocol(
 		authCallback,
 		referenceDiscovery,
-		*allowDirectPushToMaster,
+		config.Gitserver.AllowDirectPushToMaster,
 		gitserver.OverallWallTimeHardLimit,
 		&gitserver.LibinteractiveCompiler{
-			LibinteractiveJarPath: *libinteractivePath,
+			LibinteractiveJarPath: config.Gitserver.LibinteractivePath,
 			Log:                   log,
 		},
 		log,
 	)
 
-	if *rootPath == "" {
-		log.Error("root path cannot be empty. Please specify one with -root")
-		os.Exit(1)
-	}
-
 	var servers []*http.Server
 	var wg sync.WaitGroup
 	gitServer := &http.Server{
-		Addr:    fmt.Sprintf(":%d", *port),
-		Handler: muxHandler(*rootPath, protocol, log),
+		Addr:    fmt.Sprintf(":%d", config.Gitserver.Port),
+		Handler: muxHandler(config.Gitserver.RootPath, protocol, log),
 	}
 	servers = append(servers, gitServer)
 	wg.Add(1)
@@ -318,7 +320,7 @@ func main() {
 		"address", gitServer.Addr,
 	)
 
-	if *pprofPort > 0 {
+	if config.Gitserver.PprofPort > 0 {
 		pprofServeMux := http.NewServeMux()
 		pprofServeMux.HandleFunc("/debug/pprof/", pprof.Index)
 		pprofServeMux.HandleFunc("/debug/pprof/cmdline", pprof.Cmdline)
@@ -326,7 +328,7 @@ func main() {
 		pprofServeMux.HandleFunc("/debug/pprof/symbol", pprof.Symbol)
 		pprofServeMux.HandleFunc("/debug/pprof/trace", pprof.Trace)
 		pprofServer := &http.Server{
-			Addr:    fmt.Sprintf("localhost:%d", *pprofPort),
+			Addr:    fmt.Sprintf("localhost:%d", config.Gitserver.PprofPort),
 			Handler: pprofServeMux,
 		}
 		servers = append(servers, pprofServer)
