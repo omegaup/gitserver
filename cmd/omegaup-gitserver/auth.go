@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"encoding/base64"
+	"fmt"
 	"github.com/inconshreveable/log15"
 	"github.com/o1egl/paseto"
 	"github.com/omegaup/githttp"
@@ -70,7 +71,10 @@ func (a *bearerAuthorization) authorize(
 	if !ok {
 		w.Header().Set(
 			"WWW-Authenticate",
-			"Basic realm=\"omegaUp gitserver\", Bearer realm=\"omegaUp gitserver\"",
+			fmt.Sprintf(
+				"Basic realm=%[1]q, Bearer realm=%[1]q",
+				fmt.Sprintf("omegaUp gitserver problem %q", repositoryName),
+			),
 		)
 		w.WriteHeader(http.StatusUnauthorized)
 		return githttp.AuthorizationDenied, ""
@@ -107,7 +111,7 @@ func (a *secretTokenAuthorization) parseSecretTokenAuth(auth string) (username s
 		return
 	}
 
-	if !strings.EqualFold(tokens[0], "Bearer") {
+	if !strings.EqualFold(tokens[0], "Bearer") && !strings.EqualFold(tokens[0], "OmegaUpSharedSecret") {
 		return
 	}
 	if tokens[1] != a.secretToken {
@@ -133,7 +137,10 @@ func (a *secretTokenAuthorization) authorize(
 	if !ok {
 		w.Header().Set(
 			"WWW-Authenticate",
-			"Basic realm=\"omegaUp gitserver\", Bearer realm=\"omegaUp gitserver\"",
+			fmt.Sprintf(
+				"Basic realm=%[1]q, Bearer realm=%[1]q, OmegaUpSharedSecret realm=%[1]q",
+				fmt.Sprintf("omegaUp gitserver problem %q", repositoryName),
+			),
 		)
 		w.WriteHeader(http.StatusUnauthorized)
 		return githttp.AuthorizationDenied, ""
