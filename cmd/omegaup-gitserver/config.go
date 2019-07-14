@@ -22,9 +22,9 @@ type GitserverConfig struct {
 	// RootPath is the root path of all repositories.
 	RootPath string
 
-	// PublicKeyBase64 is the base64-encoded public key of the omegaUp frontend.
+	// PublicKey is the base64-encoded public key of the omegaUp frontend.
 	// Used for verifying Paseto tokens.
-	PublicKeyBase64 string
+	PublicKey string
 
 	// SecretToken is a shared secret with the frontend that can be used to
 	// authenticate instead of using PKI for speeding up tests.
@@ -62,7 +62,7 @@ var defaultConfig = Config{
 	},
 	Gitserver: GitserverConfig{
 		RootPath:                "/var/lib/omegaup/problems.git",
-		PublicKeyBase64:         "gKEg5JlIOA1BsIxETZYhjd+ZGchY/rZeQM0GheAWvXw=",
+		PublicKey:               "gKEg5JlIOA1BsIxETZYhjd+ZGchY/rZeQM0GheAWvXw=",
 		SecretToken:             "",
 		Port:                    33861,
 		PprofPort:               33862,
@@ -82,6 +82,7 @@ func NewConfig(reader io.Reader) (*Config, error) {
 
 	// Read basic config
 	decoder := json.NewDecoder(reader)
+	decoder.DisallowUnknownFields()
 	if err := decoder.Decode(&config); err != nil {
 		return nil, err
 	}

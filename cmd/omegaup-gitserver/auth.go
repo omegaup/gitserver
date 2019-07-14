@@ -154,7 +154,7 @@ func (a *secretTokenAuthorization) authorize(
 }
 
 func createAuthorizationCallback(config *Config, log log15.Logger) (githttp.AuthorizationCallback, error) {
-	if config.Gitserver.PublicKeyBase64 == "" && config.Gitserver.SecretToken != "" {
+	if config.Gitserver.PublicKey == "" && config.Gitserver.SecretToken != "" {
 		log.Warn("using insecure secret token authorization")
 		auth := secretTokenAuthorization{
 			log:         log,
@@ -162,7 +162,7 @@ func createAuthorizationCallback(config *Config, log log15.Logger) (githttp.Auth
 		}
 		return auth.authorize, nil
 	}
-	keyBytes, err := base64.StdEncoding.DecodeString(config.Gitserver.PublicKeyBase64)
+	keyBytes, err := base64.StdEncoding.DecodeString(config.Gitserver.PublicKey)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to parse the base64-encoded public key")
 	}
