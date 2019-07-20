@@ -44,12 +44,19 @@ func referenceDiscovery(
 		return true
 	}
 	if requestContext.HasSolved {
-		return referenceName == "refs/heads/public" ||
-			referenceName == "refs/heads/protected" ||
-			referenceName == "refs/heads/private"
+		// Solvers can also view the protected branch
+		if referenceName == "refs/heads/protected" {
+			return true
+		}
 	}
 
-	return referenceName == "refs/heads/public"
+	if requestContext.CanView {
+		// Public problems can be viewed by anyone.
+		if referenceName == "refs/heads/public" {
+			return true
+		}
+	}
+	return false
 }
 
 type muxGitHandler struct {

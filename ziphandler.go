@@ -1435,18 +1435,18 @@ func (h *zipUploadHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	ctx := request.NewContext(r.Context(), h.metrics)
-
-	create := r.URL.Query().Get("create") != ""
+	requestContext := request.FromContext(ctx)
+	requestContext.Create = r.URL.Query().Get("create") != ""
 
 	repositoryPath := path.Join(h.rootPath, repositoryName)
 	h.log.Info(
 		"Request",
 		"Method", r.Method,
 		"path", repositoryPath,
-		"create", create,
+		"create", requestContext.Create,
 	)
-	if _, err := os.Stat(repositoryPath); os.IsNotExist(err) != create {
-		if create {
+	if _, err := os.Stat(repositoryPath); os.IsNotExist(err) != requestContext.Create {
+		if requestContext.Create {
 			h.log.Error("Creating on top of an existing directory", "path", repositoryPath)
 			w.WriteHeader(http.StatusConflict)
 		} else {
@@ -1497,7 +1497,7 @@ func (h *zipUploadHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	var repo *git.Repository
 	commitCallback := func() error { return nil }
-	if create {
+	if requestContext.Create {
 		dir, err := ioutil.TempDir(filepath.Dir(repositoryPath), "repository")
 		if err != nil {
 			h.log.Error("Failed to create temporary directory", "err", err)

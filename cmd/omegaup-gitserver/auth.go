@@ -3,10 +3,14 @@ package main
 import (
 	"context"
 	"crypto/subtle"
+	"database/sql"
 	"encoding/base64"
+	"encoding/json"
 	stderrors "errors"
 	"fmt"
+	_ "github.com/go-sql-driver/mysql"
 	"github.com/inconshreveable/log15"
+	_ "github.com/mattn/go-sqlite3"
 	"github.com/o1egl/paseto"
 	"github.com/omegaup/githttp"
 	"github.com/omegaup/gitserver/request"
@@ -14,6 +18,7 @@ import (
 	"golang.org/x/crypto/argon2"
 	"golang.org/x/crypto/ed25519"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 )
@@ -33,8 +38,19 @@ const (
 
 type omegaupAuthorization struct {
 	log         log15.Logger
+	db          *sql.DB
 	publicKey   ed25519.PublicKey
 	secretToken string
+
+	config *Config
+}
+
+type authorizationProblemResponse struct {
+	Status    string `json:"status"`
+	HasSolved bool   `json:"has_solved"`
+	IsAdmin   bool   `json:"is_admin"`
+	CanView   bool   `json:"can_view"`
+	CanEdit   bool   `json:"can_edit"`
 }
 
 func verifyArgon2idHash(password, encodedHash string) (bool, error) {
@@ -107,8 +123,51 @@ func (a *omegaupAuthorization) parseUsernameAndPassword(
 		username = basicAuthUsername
 		problem = repositoryName
 		ok = true
+		return
 	}
 
+	if username == "omegaup:system" {
+		// omegaup:system can only log in using the auth token or the secret token.
+		a.log.Error("user tried to login with restricted user", "username", username)
+		return
+	}
+
+	var gitToken sql.NullString
+	err := a.db.QueryRow(
+		`SELECT
+			u.git_token
+		FROM
+			Users u
+		INNER JOIN
+			Identities i ON i.identity_id = u.main_identity_id
+		WHERE
+			i.username = ?;`,
+		basicAuthUsername,
+	).Scan(
+		&gitToken,
+	)
+	if err != nil {
+		a.log.Error("failed to query user", "username", username, "err", err)
+		return
+	}
+
+	if !gitToken.Valid {
+		a.log.Error("user is missing a git token", "username", username)
+		return
+	}
+
+	ok, err = verifyArgon2idHash(password, gitToken.String)
+	if err != nil {
+		a.log.Error("failed to verify user's git token", "username", username, "err", err)
+		return
+	}
+
+	if ok {
+		username = basicAuthUsername
+		problem = repositoryName
+	} else {
+		a.log.Error("user provided the wrong git token", "username", username)
+	}
 	return
 }
 
@@ -147,6 +206,39 @@ func (a *omegaupAuthorization) parseAuthorizationHeader(
 	return
 }
 
+func (a *omegaupAuthorization) getAuthorizationFromFrontend(
+	username string,
+	problem string,
+) (*authorizationProblemResponse, error) {
+	client := http.Client{}
+	response, err := client.PostForm(
+		a.config.Gitserver.FrontendAuthorizationProblemRequestURL,
+		url.Values{
+			"token":         {a.config.Gitserver.FrontendSharedSecret},
+			"username":      {username},
+			"problem_alias": {problem},
+		},
+	)
+	if err != nil {
+		return nil, errors.Wrap(
+			err,
+			"failed to request permissions from the frontend",
+		)
+	}
+	defer response.Body.Close()
+
+	var msg authorizationProblemResponse
+	decoder := json.NewDecoder(response.Body)
+	if err := decoder.Decode(&msg); err != nil {
+		return nil, errors.Wrap(
+			err,
+			"failed to read response for permissions request from the frontend",
+		)
+	}
+
+	return &msg, nil
+}
+
 func (a *omegaupAuthorization) authorize(
 	ctx context.Context,
 	w http.ResponseWriter,
@@ -166,6 +258,12 @@ func (a *omegaupAuthorization) authorize(
 	if basicAuthUsername != "" && basicAuthUsername != username {
 		// If Basic authentication was attempted, verify that the token actually corresponds to the user.
 		ok = false
+		log.Error(
+			"Mismatched Basic authentication username",
+			"username", username,
+			"basic auth username", basicAuthUsername,
+			"repository", repositoryName,
+		)
 	}
 	if !ok {
 		realm := fmt.Sprintf("omegaUp gitserver problem %q", repositoryName)
@@ -186,31 +284,70 @@ func (a *omegaupAuthorization) authorize(
 		}
 		w.Header().Set("WWW-Authenticate", strings.Join(authenticationSchemes, ", "))
 		w.WriteHeader(http.StatusUnauthorized)
+		log.Error(
+			"Missing authentication",
+			"username", username,
+			"repository", repositoryName,
+		)
 		return githttp.AuthorizationDenied, ""
 	}
 
 	if problem != repositoryName {
 		w.WriteHeader(http.StatusForbidden)
+		log.Error(
+			"Mismatched problem name",
+			"username", username,
+			"repository", repositoryName,
+			"problem", problem,
+		)
 		return githttp.AuthorizationDenied, ""
 	}
 
+	requestContext := request.FromContext(ctx)
+	if username == "omegaup:system" {
+		// This is the frontend, and we trust it completely.
+		requestContext.IsAdmin = true
+		requestContext.CanView = true
+		requestContext.CanEdit = true
+	} else if requestContext.Create {
+		// This is a repository creation request. There is nothing in the database
+		// yet, so grant them all privileges.
+		requestContext.IsAdmin = true
+		requestContext.CanView = true
+		requestContext.CanEdit = true
+	} else {
+		auth, err := a.getAuthorizationFromFrontend(
+			username,
+			problem,
+		)
+		if err != nil {
+			log.Error(
+				"Auth",
+				"username", username,
+				"repository", repositoryName,
+				"operation", operation,
+				"err", err,
+			)
+			return githttp.AuthorizationDenied, username
+		}
+		requestContext.HasSolved = auth.HasSolved
+		requestContext.IsAdmin = auth.IsAdmin
+		requestContext.CanView = auth.CanView
+		requestContext.CanEdit = auth.CanEdit
+	}
 	log.Info(
 		"Auth",
 		"username", username,
 		"repository", repositoryName,
 		"operation", operation,
 	)
-	requestContext := request.FromContext(ctx)
-	// Right now only the frontend can issue requests, so we trust it completely.
-	requestContext.CanView = true
-	requestContext.IsAdmin = true
-	requestContext.CanEdit = true
 	return githttp.AuthorizationAllowed, username
 }
 
 func createAuthorizationCallback(config *Config, log log15.Logger) (githttp.AuthorizationCallback, error) {
 	auth := omegaupAuthorization{
-		log: log,
+		log:    log,
+		config: config,
 	}
 
 	if config.Gitserver.SecretToken != "" {
@@ -225,5 +362,17 @@ func createAuthorizationCallback(config *Config, log log15.Logger) (githttp.Auth
 
 		auth.publicKey = ed25519.PublicKey(keyBytes)
 	}
+
+	db, err := sql.Open(
+		config.Db.Driver,
+		config.Db.DataSourceName,
+	)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to open the database")
+	}
+	if err := db.Ping(); err != nil {
+		return nil, errors.Wrap(err, "failed to ping the database")
+	}
+	auth.db = db
 	return auth.authorize, nil
 }

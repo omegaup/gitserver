@@ -12,6 +12,7 @@ const requestContextKey key = 0
 
 // Context stores a few variables that are request-specific.
 type Context struct {
+	Create       bool
 	IsAdmin      bool
 	CanView      bool
 	CanEdit      bool

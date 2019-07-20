@@ -42,6 +42,14 @@ type GitserverConfig struct {
 	// AllowDirectPushToMaster determines whether gitserver allows pushing
 	// directly to master.
 	AllowDirectPushToMaster bool
+
+	// FrontendSharedSecret is a secret shared with the frontend to be able to
+	// call privileged APIs without needing to authenticate.
+	FrontendSharedSecret string
+
+	// FrontendAuthorizationProblemRequestURL is the URL of the frontend API
+	// request to get user's privileges for a problem.
+	FrontendAuthorizationProblemRequestURL string
 }
 
 // Config represents the configuration for the whole program.
@@ -61,13 +69,15 @@ var defaultConfig = Config{
 		Level: "info",
 	},
 	Gitserver: GitserverConfig{
-		RootPath:                "/var/lib/omegaup/problems.git",
-		PublicKey:               "gKEg5JlIOA1BsIxETZYhjd+ZGchY/rZeQM0GheAWvXw=",
-		SecretToken:             "",
-		Port:                    33861,
-		PprofPort:               33862,
-		LibinteractivePath:      "/usr/share/java/libinteractive.jar",
-		AllowDirectPushToMaster: false,
+		RootPath:                               "/var/lib/omegaup/problems.git",
+		PublicKey:                              "gKEg5JlIOA1BsIxETZYhjd+ZGchY/rZeQM0GheAWvXw=",
+		SecretToken:                            "",
+		Port:                                   33861,
+		PprofPort:                              33862,
+		LibinteractivePath:                     "/usr/share/java/libinteractive.jar",
+		AllowDirectPushToMaster:                false,
+		FrontendSharedSecret:                   "secret",
+		FrontendAuthorizationProblemRequestURL: "https://omegaup.com/api/authorization/problem/",
 	},
 }
 
