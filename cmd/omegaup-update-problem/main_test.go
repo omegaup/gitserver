@@ -251,13 +251,13 @@ func TestProblemUpdateZip(t *testing.T) {
 		}
 
 		expectedUpdatedFiles := []gitserver.UpdatedFile{
-			{".gitattributes", "added"},
-			{".gitignore", "added"},
-			{"cases/0.in", "added"},
-			{"cases/0.out", "added"},
-			{"settings.distrib.json", "added"},
-			{"settings.json", "added"},
-			{"statements/es.markdown", "added"},
+			{Path: ".gitattributes", Type: "added"},
+			{Path: ".gitignore", Type: "added"},
+			{Path: "cases/0.in", Type: "added"},
+			{Path: "cases/0.out", Type: "added"},
+			{Path: "settings.distrib.json", Type: "added"},
+			{Path: "settings.json", Type: "added"},
+			{Path: "statements/es.markdown", Type: "added"},
 		}
 		if !reflect.DeepEqual(expectedUpdatedFiles, updateResult.UpdatedFiles) {
 			t.Errorf(
@@ -307,7 +307,7 @@ func TestProblemUpdateZip(t *testing.T) {
 		}
 
 		expectedUpdatedFiles := []gitserver.UpdatedFile{
-			{"statements/es.markdown", "modified"},
+			{Path: "statements/es.markdown", Type: "modified"},
 		}
 		if !reflect.DeepEqual(expectedUpdatedFiles, updateResult.UpdatedFiles) {
 			t.Errorf(
@@ -384,13 +384,13 @@ func TestProblemUpdateBlobs(t *testing.T) {
 		}
 
 		expectedUpdatedFiles := []gitserver.UpdatedFile{
-			{".gitattributes", "added"},
-			{".gitignore", "added"},
-			{"cases/0.in", "added"},
-			{"cases/0.out", "added"},
-			{"settings.distrib.json", "added"},
-			{"settings.json", "added"},
-			{"statements/es.markdown", "added"},
+			{Path: ".gitattributes", Type: "added"},
+			{Path: ".gitignore", Type: "added"},
+			{Path: "cases/0.in", Type: "added"},
+			{Path: "cases/0.out", Type: "added"},
+			{Path: "settings.distrib.json", Type: "added"},
+			{Path: "settings.json", Type: "added"},
+			{Path: "statements/es.markdown", Type: "added"},
 		}
 		if !reflect.DeepEqual(expectedUpdatedFiles, updateResult.UpdatedFiles) {
 			t.Errorf(
