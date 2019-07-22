@@ -27,6 +27,11 @@ var (
 		"/etc/omegaup/gitserver/config.json",
 		"gitserver configuration file",
 	)
+	insecureSkipAuthorization = flag.Bool(
+		"insecure-skip-authorization",
+		false,
+		"grant all privileges to all users",
+	)
 	version = flag.Bool("version", false, "Print the version and exit")
 	log     log15.Logger
 

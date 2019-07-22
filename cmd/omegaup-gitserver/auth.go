@@ -304,7 +304,7 @@ func (a *omegaupAuthorization) authorize(
 	}
 
 	requestContext := request.FromContext(ctx)
-	if username == "omegaup:system" {
+	if username == "omegaup:system" || *insecureSkipAuthorization {
 		// This is the frontend, and we trust it completely.
 		requestContext.IsAdmin = true
 		requestContext.CanView = true
