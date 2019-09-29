@@ -263,6 +263,82 @@ func TestConvertZip(t *testing.T) {
 	}
 }
 
+func TestTestplan(t *testing.T) {
+	tmpDir, err := ioutil.TempDir("", t.Name())
+	if err != nil {
+		t.Fatalf("Failed to create directory: %v", err)
+	}
+	if os.Getenv("PRESERVE") == "" {
+		defer os.RemoveAll(tmpDir)
+	}
+
+	problemAlias := "sumas"
+
+	repo, err := InitRepository(path.Join(tmpDir, problemAlias))
+	if err != nil {
+		t.Fatalf("Failed to initialize git repository: %v", err)
+	}
+	defer repo.Free()
+
+	log := base.StderrLog()
+
+	for testplanContents, expectedError := range map[string]string{
+		"0 0.0.0.0":        "invalid-testplan: invalid weight '0.0.0.0': strconv.ParseFloat: parsing \"0.0.0.0\": invalid syntax",
+		"0 invalid-weight": "invalid-testplan: .zip missing case 0",
+		"1 1":              "invalid-testplan: .zip missing case 0",
+		"0 1\n1 1":         "invalid-testplan: testplan missing case 1",
+		"0 1\n0.1 1":       "invalid-testplan: testplan missing case 0.1",
+	} {
+		fileContents := map[string]string{
+			".gitignore":             defaultGitfiles[".gitignore"],
+			".gitattributes":         defaultGitfiles[".gitattributes"],
+			"cases/0.in":             "1 2\n",
+			"cases/0.out":            "3\n",
+			"statements/es.markdown": "Sumas\n",
+			"testplan":               testplanContents,
+		}
+
+		zipContents, err := gitservertest.CreateZip(wrapReaders(fileContents))
+		if err != nil {
+			t.Fatalf("Failed to create zip: %v", err)
+		}
+		zipReader, err := zip.NewReader(bytes.NewReader(zipContents), int64(len(zipContents)))
+		if err != nil {
+			t.Fatalf("Failed to create directory: %v", err)
+		}
+
+		parent := &git.Oid{}
+		commitMessage := "Initial commit"
+
+		_, err = ConvertZipToPackfile(
+			zipReader,
+			nil,
+			ZipMergeStrategyTheirs,
+			repo,
+			parent,
+			&git.Signature{
+				Name:  "author",
+				Email: "author@test.test",
+				When:  time.Unix(0, 0).In(time.UTC),
+			},
+			&git.Signature{
+				Name:  "committer",
+				Email: "committer@test.test",
+				When:  time.Unix(0, 0).In(time.UTC),
+			},
+			commitMessage,
+			true,
+			ioutil.Discard,
+			log,
+		)
+		if err == nil {
+			t.Errorf("For testplan %s, expected to fail converting .zip, but didn't", testplanContents)
+		} else if err.Error() != expectedError {
+			t.Errorf("For testplan %s, expected %q, got %q", testplanContents, expectedError, err.Error())
+		}
+	}
+}
+
 func TestUpdateProblemSettings(t *testing.T) {
 	tmpDir, err := ioutil.TempDir("", t.Name())
 	if err != nil {

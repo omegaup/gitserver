@@ -408,7 +408,40 @@ func addCaseName(
 	}
 }
 
-func parseTestplan(testplan io.Reader, groupSettings map[string]map[string]*big.Rat) error {
+func symmetricDiffSettings(
+	aGroupSettings map[string]map[string]*big.Rat,
+	bGroupSettings map[string]map[string]*big.Rat,
+	leftName string,
+) error {
+	for groupName, aGroup := range aGroupSettings {
+		bGroup, ok := bGroupSettings[groupName]
+		if !ok {
+			bGroup = nil
+		}
+
+		for caseName := range aGroup {
+			if _, ok = bGroup[caseName]; !ok {
+				return base.ErrorWithCategory(
+					ErrInvalidTestplan,
+					errors.Errorf(
+						"%s missing case %s",
+						leftName,
+						caseName,
+					),
+				)
+			}
+		}
+	}
+
+	return nil
+}
+
+func parseTestplan(
+	testplan io.Reader,
+	groupSettings map[string]map[string]*big.Rat,
+	zipGroupSettings map[string]map[string]*big.Rat,
+	log log15.Logger,
+) error {
 	matcher := regexp.MustCompile("^\\s*([^#[:space:]]+)\\s+([0-9.]+)\\s*$")
 	s := bufio.NewScanner(testplan)
 
@@ -438,6 +471,15 @@ func parseTestplan(testplan io.Reader, groupSettings map[string]map[string]*big.
 			ErrInvalidTestplan,
 			err,
 		)
+	}
+
+	// Validate that the files in the testplan are all present in the .zip file.
+	if err := symmetricDiffSettings(zipGroupSettings, groupSettings, ".zip"); err != nil {
+		return err
+	}
+	// ... and viceversa.
+	if err := symmetricDiffSettings(groupSettings, zipGroupSettings, "testplan"); err != nil {
+		return err
 	}
 
 	return nil
@@ -537,23 +579,24 @@ func CreatePackfile(
 
 		// Information needed to build ProblemSettings.Cases.
 		groupSettings := make(map[string]map[string]*big.Rat)
+		for filename := range contents {
+			if !strings.HasPrefix(filename, "cases/") {
+				continue
+			}
+			filename = strings.TrimPrefix(filename, "cases/")
+			if !strings.HasSuffix(filename, ".in") {
+				continue
+			}
+			caseName := strings.TrimSuffix(filename, ".in")
+
+			addCaseName(caseName, groupSettings, big.NewRat(1, 1), false)
+		}
 		if r, ok := contents["testplan"]; ok {
-			if err := parseTestplan(r, groupSettings); err != nil {
+			zipGroupSettings := groupSettings
+			groupSettings = make(map[string]map[string]*big.Rat)
+			if err := parseTestplan(r, groupSettings, zipGroupSettings, log); err != nil {
 				// parseTestplan already wrapped the error correctly.
 				return nil, err
-			}
-		} else {
-			for filename := range contents {
-				if !strings.HasPrefix(filename, "cases/") {
-					continue
-				}
-				filename = strings.TrimPrefix(filename, "cases/")
-				if !strings.HasSuffix(filename, ".in") {
-					continue
-				}
-				caseName := strings.TrimSuffix(filename, ".in")
-
-				addCaseName(caseName, groupSettings, big.NewRat(1, 1), false)
 			}
 		}
 		// Remove this file since it's redundant with settings.json.
