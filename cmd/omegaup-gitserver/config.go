@@ -27,7 +27,8 @@ type GitserverConfig struct {
 	PublicKey string
 
 	// SecretToken is a shared secret with the frontend that can be used to
-	// authenticate instead of using PKI for speeding up tests.
+	// authenticate instead of using PKI for speeding up tests. It can also be
+	// used to call privileged APIs without needing to authenticate.
 	SecretToken string
 
 	// Port is the TCP port in which the server will listen.
@@ -42,10 +43,6 @@ type GitserverConfig struct {
 	// AllowDirectPushToMaster determines whether gitserver allows pushing
 	// directly to master.
 	AllowDirectPushToMaster bool
-
-	// FrontendSharedSecret is a secret shared with the frontend to be able to
-	// call privileged APIs without needing to authenticate.
-	FrontendSharedSecret string
 
 	// FrontendAuthorizationProblemRequestURL is the URL of the frontend API
 	// request to get user's privileges for a problem.
@@ -76,7 +73,6 @@ var defaultConfig = Config{
 		PprofPort:                              33862,
 		LibinteractivePath:                     "/usr/share/java/libinteractive.jar",
 		AllowDirectPushToMaster:                false,
-		FrontendSharedSecret:                   "secret",
 		FrontendAuthorizationProblemRequestURL: "https://omegaup.com/api/authorization/problem/",
 	},
 }

@@ -214,7 +214,7 @@ func (a *omegaupAuthorization) getAuthorizationFromFrontend(
 	response, err := client.PostForm(
 		a.config.Gitserver.FrontendAuthorizationProblemRequestURL,
 		url.Values{
-			"token":         {a.config.Gitserver.FrontendSharedSecret},
+			"token":         {a.config.Gitserver.SecretToken},
 			"username":      {username},
 			"problem_alias": {problem},
 		},
