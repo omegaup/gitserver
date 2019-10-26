@@ -37,10 +37,9 @@ const (
 )
 
 type omegaupAuthorization struct {
-	log         log15.Logger
-	db          *sql.DB
-	publicKey   ed25519.PublicKey
-	secretToken string
+	log       log15.Logger
+	db        *sql.DB
+	publicKey ed25519.PublicKey
 
 	config *Config
 }
@@ -119,7 +118,9 @@ func (a *omegaupAuthorization) parseUsernameAndPassword(
 		}
 	}
 
-	if a.secretToken != "" && password == a.secretToken {
+	if a.config.Gitserver.AllowSecretTokenAuthentication &&
+		a.config.Gitserver.SecretToken != "" &&
+		password == a.config.Gitserver.SecretToken {
 		username = basicAuthUsername
 		problem = repositoryName
 		ok = true
@@ -187,13 +188,13 @@ func (a *omegaupAuthorization) parseAuthorizationHeader(
 		}
 	}
 
-	if a.secretToken != "" {
+	if a.config.Gitserver.AllowSecretTokenAuthentication && a.config.Gitserver.SecretToken != "" {
 		if strings.EqualFold(tokens[0], omegaUpSharedSecretAuthenticationScheme) {
 			if len(tokens) != 3 {
 				return
 			}
 
-			if tokens[1] != a.secretToken {
+			if tokens[1] != a.config.Gitserver.SecretToken {
 				return
 			}
 
@@ -276,7 +277,7 @@ func (a *omegaupAuthorization) authorize(
 				fmt.Sprintf("%s realm=%q", bearerAuthenticationScheme, realm),
 			)
 		}
-		if a.secretToken != "" {
+		if a.config.Gitserver.AllowSecretTokenAuthentication && a.config.Gitserver.SecretToken != "" {
 			authenticationSchemes = append(
 				authenticationSchemes,
 				fmt.Sprintf("%s realm=%q", omegaUpSharedSecretAuthenticationScheme, realm),
@@ -350,9 +351,8 @@ func createAuthorizationCallback(config *Config, log log15.Logger) (githttp.Auth
 		config: config,
 	}
 
-	if config.Gitserver.SecretToken != "" {
+	if config.Gitserver.AllowSecretTokenAuthentication {
 		log.Warn("using insecure secret token authorization")
-		auth.secretToken = config.Gitserver.SecretToken
 	}
 	if config.Gitserver.PublicKey != "" {
 		keyBytes, err := base64.StdEncoding.DecodeString(config.Gitserver.PublicKey)

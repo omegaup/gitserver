@@ -27,9 +27,13 @@ type GitserverConfig struct {
 	PublicKey string
 
 	// SecretToken is a shared secret with the frontend that can be used to
-	// authenticate instead of using PKI for speeding up tests. It can also be
-	// used to call privileged APIs without needing to authenticate.
+	// authenticate instead of using PKI, in both directions.
 	SecretToken string
+
+	// AllowSecretTokenAuthentication controls whether the SecretToken can be
+	// used to authenticate incoming requests, instead of just being used for
+	// outgoing requests towards the frontend.
+	AllowSecretTokenAuthentication bool
 
 	// Port is the TCP port in which the server will listen.
 	Port uint16
