@@ -31,25 +31,15 @@ func TestRoundtrip(t *testing.T) {
 		t.Fatalf("failed to unmerge repository: %v", err)
 	}
 
-	expected := []unmergeResult{
-		{
-			OriginalCommitID:      "c2be64797d18887307ffd39fe5334b434b3e5e3b",
-			NewCommitID:           "c2be64797d18887307ffd39fe5334b434b3e5e3b",
-			OriginalPrivateTreeID: "f681044ac3f5618ca2e5de47fd264dc31fcd651e",
-			NewPrivateTreeID:      "f681044ac3f5618ca2e5de47fd264dc31fcd651e",
+	expected := &unmergeReport{
+		CommitMapping: map[string]string{
+			"c2be64797d18887307ffd39fe5334b434b3e5e3b": "c2be64797d18887307ffd39fe5334b434b3e5e3b",
+			"c677d4fc0d8f68a6fb719fc8552bcee230e2be45": "c677d4fc0d8f68a6fb719fc8552bcee230e2be45",
+			"10378fcb2306a5b7876afeb9efda074066887fb0": "10378fcb2306a5b7876afeb9efda074066887fb0",
 		},
-		{
-			OriginalCommitID:      "c677d4fc0d8f68a6fb719fc8552bcee230e2be45",
-			NewCommitID:           "c677d4fc0d8f68a6fb719fc8552bcee230e2be45",
-			OriginalPrivateTreeID: "f681044ac3f5618ca2e5de47fd264dc31fcd651e",
-			// private tree not modified, so it's not reported.
-		},
-		{
-			OriginalCommitID:      "10378fcb2306a5b7876afeb9efda074066887fb0",
-			NewCommitID:           "10378fcb2306a5b7876afeb9efda074066887fb0",
-			OriginalPrivateTreeID: "2eb4e541a48b5cb01cbe4e0151e3c318bb4ad0cf",
-			NewPrivateTreeID:      "2eb4e541a48b5cb01cbe4e0151e3c318bb4ad0cf",
-			Published:             true,
+		PrivateTreeIDMapping: map[string]string{
+			"f681044ac3f5618ca2e5de47fd264dc31fcd651e": "f681044ac3f5618ca2e5de47fd264dc31fcd651e",
+			"2eb4e541a48b5cb01cbe4e0151e3c318bb4ad0cf": "2eb4e541a48b5cb01cbe4e0151e3c318bb4ad0cf",
 		},
 	}
 

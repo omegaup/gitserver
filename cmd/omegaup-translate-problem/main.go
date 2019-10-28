@@ -35,6 +35,11 @@ type unmergeResult struct {
 	Published             bool   `json:"published,omitempty"`
 }
 
+type unmergeReport struct {
+	CommitMapping        map[string]string `json:"commit_mapping,omitempty"`
+	PrivateTreeIDMapping map[string]string `json:"private_tree_id_mapping,omitempty"`
+}
+
 func createPackfileFromSplitCommit(
 	sourceRepo, destRepo *git.Repository,
 	commit *git.Commit,
@@ -283,7 +288,7 @@ func createPackfileFromMergedCommit(
 	sourceRepo, destRepo *git.Repository,
 	commit *git.Commit,
 	log log15.Logger,
-) (*unmergeResult, error) {
+) ([]*unmergeResult, error) {
 	// Create the new commit object and add it to a packfile builder.
 	head, err := destRepo.Head()
 	if err != nil && !git.IsErrorCode(err, git.ErrUnbornBranch) {
@@ -387,41 +392,46 @@ func createPackfileFromMergedCommit(
 		return nil, errors.Wrap(err, "failed to push packfile")
 	}
 
-	problemTagString := strings.TrimPrefix(
-		commit.Message()[trailersIndex+2:],
-		"Omegaup-Translate-Problem-Tag: ",
+	var results []*unmergeResult
+	trailers := strings.Split(
+		strings.TrimSpace(commit.Message()[trailersIndex+2:]),
+		"\n",
 	)
-	var result unmergeResult
+	for _, trailer := range trailers {
+		problemTagString := strings.TrimPrefix(trailer, "Omegaup-Translate-Problem-Tag: ")
+		var singleResult unmergeResult
 
-	if err := json.Unmarshal([]byte(problemTagString), &result); err != nil {
-		return nil, errors.Wrap(err, "failed to unmarshal the problem tag")
+		if err := json.Unmarshal([]byte(problemTagString), &singleResult); err != nil {
+			return nil, errors.Wrapf(err, "failed to unmarshal the problem tag for %q", problemTagString)
+		}
+
+		for _, updatedRef := range updatedRefs {
+			if updatedRef.Name == "refs/heads/private" {
+				singleResult.NewPrivateTreeID = updatedRef.ToTree
+			}
+			if updatedRef.Name == "refs/heads/master" {
+				singleResult.NewCommitID = updatedRef.To
+			}
+		}
+
+		if singleResult.Published {
+			publishedID, err := git.NewOid(singleResult.NewCommitID)
+			if err != nil {
+				return nil, errors.Wrapf(err, "failed to parse commit ID %q", singleResult.NewCommitID)
+			}
+			publishedReference, err := destRepo.References.Create("refs/heads/published", publishedID, true, "")
+			if err != nil {
+				return nil, errors.Wrapf(err, "failed to update published branch for commit %q", singleResult.NewCommitID)
+			}
+			publishedReference.Free()
+		}
+		results = append(results, &singleResult)
 	}
 
-	for _, updatedRef := range updatedRefs {
-		if updatedRef.Name == "refs/heads/private" {
-			result.NewPrivateTreeID = updatedRef.ToTree
-		}
-		if updatedRef.Name == "refs/heads/master" {
-			result.NewCommitID = updatedRef.To
-		}
-	}
-
-	if result.Published {
-		publishedID, err := git.NewOid(result.NewCommitID)
-		if err != nil {
-			return nil, errors.Wrapf(err, "failed to parse commit ID %q", result.NewCommitID)
-		}
-		publishedReference, err := destRepo.References.Create("refs/heads/published", publishedID, true, "")
-		if err != nil {
-			return nil, errors.Wrapf(err, "failed to update published branch for commit %q", result.NewCommitID)
-		}
-		publishedReference.Free()
-	}
-
-	return &result, nil
+	return results, nil
 }
 
-func unmergeRepository(sourceRepositoryPath, destRepositoryPath string, log log15.Logger) ([]unmergeResult, error) {
+func unmergeRepository(sourceRepositoryPath, destRepositoryPath string, log log15.Logger) (*unmergeReport, error) {
 	sourceRepo, err := git.OpenRepository(sourceRepositoryPath)
 	if err != nil {
 		return nil, errors.Wrapf(
@@ -525,9 +535,12 @@ func unmergeRepository(sourceRepositoryPath, destRepositoryPath string, log log1
 		commits[i], commits[j] = commits[j], commits[i]
 	}
 
-	var results []unmergeResult
+	report := &unmergeReport{
+		CommitMapping:        make(map[string]string),
+		PrivateTreeIDMapping: make(map[string]string),
+	}
 	for _, commit := range commits {
-		result, err := createPackfileFromMergedCommit(sourceRepo, destRepo, commit, log)
+		results, err := createPackfileFromMergedCommit(sourceRepo, destRepo, commit, log)
 		if err != nil {
 			return nil, errors.Wrapf(
 				err,
@@ -535,10 +548,15 @@ func unmergeRepository(sourceRepositoryPath, destRepositoryPath string, log log1
 				commit.Id(),
 			)
 		}
-		results = append(results, *result)
+		for _, result := range results {
+			report.CommitMapping[result.OriginalCommitID] = result.NewCommitID
+			if result.NewPrivateTreeID != "" {
+				report.PrivateTreeIDMapping[result.OriginalPrivateTreeID] = result.NewPrivateTreeID
+			}
+		}
 	}
 
-	return results, nil
+	return report, nil
 }
 
 func main() {
