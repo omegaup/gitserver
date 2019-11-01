@@ -26,7 +26,7 @@ func TestRoundtrip(t *testing.T) {
 	if err := mergeRepository("testdata/sumas.git", mergedPath, log); err != nil {
 		t.Fatalf("failed to merge repository: %v", err)
 	}
-	got, err := unmergeRepository(mergedPath, unmergedPath, log)
+	got, err := unmergeRepository(mergedPath, unmergedPath, false, log)
 	if err != nil {
 		t.Fatalf("failed to unmerge repository: %v", err)
 	}

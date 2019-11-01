@@ -25,6 +25,11 @@ var (
 		"",
 		"path of a json file with the translation report",
 	)
+	ignoreCommitter = flag.Bool(
+		"ignore-committer",
+		false,
+		"ignore the committer and use the author instead",
+	)
 )
 
 type unmergeResult struct {
@@ -287,6 +292,7 @@ func mergeRepository(sourceRepositoryPath, destRepositoryPath string, log log15.
 func createPackfileFromMergedCommit(
 	sourceRepo, destRepo *git.Repository,
 	commit *git.Commit,
+	ignoreCommitter bool,
 	log log15.Logger,
 ) ([]*unmergeResult, error) {
 	// Create the new commit object and add it to a packfile builder.
@@ -307,10 +313,15 @@ func createPackfileFromMergedCommit(
 	if commit.ParentCount() > 0 {
 		parents = append(parents, commit.ParentId(0))
 	}
+	committer := commit.Committer()
+	if ignoreCommitter {
+		// Send the author as committer in case there was some surgery done to the commit.
+		committer = commit.Author()
+	}
 	newCommitID, err := sourceRepo.CreateCommitFromIds(
 		"",
 		commit.Author(),
-		commit.Committer(),
+		committer,
 		commit.Message()[:trailersIndex],
 		commit.TreeId(),
 		parents...,
@@ -431,7 +442,12 @@ func createPackfileFromMergedCommit(
 	return results, nil
 }
 
-func unmergeRepository(sourceRepositoryPath, destRepositoryPath string, log log15.Logger) (*unmergeReport, error) {
+func unmergeRepository(
+	sourceRepositoryPath,
+	destRepositoryPath string,
+	ignoreCommitter bool,
+	log log15.Logger,
+) (*unmergeReport, error) {
 	sourceRepo, err := git.OpenRepository(sourceRepositoryPath)
 	if err != nil {
 		return nil, errors.Wrapf(
@@ -540,7 +556,7 @@ func unmergeRepository(sourceRepositoryPath, destRepositoryPath string, log log1
 		PrivateTreeIDMapping: make(map[string]string),
 	}
 	for _, commit := range commits {
-		results, err := createPackfileFromMergedCommit(sourceRepo, destRepo, commit, log)
+		results, err := createPackfileFromMergedCommit(sourceRepo, destRepo, commit, ignoreCommitter, log)
 		if err != nil {
 			return nil, errors.Wrapf(
 				err,
@@ -600,7 +616,7 @@ func main() {
 		}
 		defer f.Close()
 
-		report, err := unmergeRepository(sourceRepositoryPath, destRepositoryPath, log)
+		report, err := unmergeRepository(sourceRepositoryPath, destRepositoryPath, *ignoreCommitter, log)
 		if err != nil {
 			log.Crit(
 				"failed to unmerge repository",
