@@ -1716,6 +1716,26 @@ func InitRepository(
 			),
 		)
 	}
+	if err := repoConfig.SetInt32("pack.deltaCacheLimit", 0); err != nil {
+		return nil, base.ErrorWithCategory(
+			ErrInternalGit,
+			errors.Wrapf(
+				err,
+				"failed to disable delta compression for repository at %s",
+				repositoryPath,
+			),
+		)
+	}
+	if err := repoConfig.SetInt32("pack.windowMemory", 1024); err != nil {
+		return nil, base.ErrorWithCategory(
+			ErrInternalGit,
+			errors.Wrapf(
+				err,
+				"failed to disable delta compression for repository at %s",
+				repositoryPath,
+			),
+		)
+	}
 
 	omegaupPath := path.Join(repositoryPath, "omegaup")
 	if err := os.Mkdir(omegaupPath, 0755); err != nil {
