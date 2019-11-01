@@ -458,11 +458,11 @@ func unmergeRepository(
 	}
 	defer sourceRepo.Free()
 
-	destRepo, err := git.InitRepository(destRepositoryPath, true)
+	destRepo, err := gitserver.InitRepository(destRepositoryPath)
 	if err != nil {
 		return nil, errors.Wrapf(
 			err,
-			"failed to open destination repository at %s",
+			"failed to create destination repository at %s",
 			destRepositoryPath,
 		)
 	}

@@ -29,6 +29,10 @@ import (
 const (
 	iterationLabel = "Iteration: "
 	objectLimit    = 10000
+
+	// GitAttributesContents is what the .gitattributes and info/attributes files
+	// contain.
+	GitAttributesContents = "cases/* -diff -delta -merge -text -crlf\n"
 )
 
 var (
@@ -1725,28 +1729,56 @@ func InitRepository(
 		)
 	}
 
-	versionPath := path.Join(omegaupPath, "version")
-	f, err := os.Create(versionPath)
-	if err != nil {
-		return nil, base.ErrorWithCategory(
-			ErrInternalGit,
-			errors.Wrapf(
-				err,
-				"failed to create omegaUp repository version file at %s",
-				versionPath,
-			),
-		)
+	{
+		versionPath := path.Join(omegaupPath, "version")
+		f, err := os.Create(versionPath)
+		if err != nil {
+			return nil, base.ErrorWithCategory(
+				ErrInternalGit,
+				errors.Wrapf(
+					err,
+					"failed to create omegaUp repository version file at %s",
+					versionPath,
+				),
+			)
+		}
+		defer f.Close()
+		if _, err := f.WriteString("1\n"); err != nil {
+			return nil, base.ErrorWithCategory(
+				ErrInternalGit,
+				errors.Wrapf(
+					err,
+					"failed to write the omegaUp repository version file at %s",
+					versionPath,
+				),
+			)
+		}
 	}
-	defer f.Close()
-	if _, err := f.WriteString("1\n"); err != nil {
-		return nil, base.ErrorWithCategory(
-			ErrInternalGit,
-			errors.Wrapf(
-				err,
-				"failed to write the omegaUp repository version file at %s",
-				versionPath,
-			),
-		)
+
+	{
+		attributesPath := path.Join(repositoryPath, "info/attributes")
+		f, err := os.Create(attributesPath)
+		if err != nil {
+			return nil, base.ErrorWithCategory(
+				ErrInternalGit,
+				errors.Wrapf(
+					err,
+					"failed to create git attributes file at %s",
+					attributesPath,
+				),
+			)
+		}
+		defer f.Close()
+		if _, err := f.WriteString(GitAttributesContents); err != nil {
+			return nil, base.ErrorWithCategory(
+				ErrInternalGit,
+				errors.Wrapf(
+					err,
+					"failed to write git attributes file at %s",
+					attributesPath,
+				),
+			)
+		}
 	}
 
 	return repo, nil

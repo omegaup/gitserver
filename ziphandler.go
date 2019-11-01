@@ -140,7 +140,7 @@ Makefile
 libinteractive/
 libinteractive.jar
 `,
-		".gitattributes": "cases/* -diff -delta -merge -text -crlf\n",
+		".gitattributes": GitAttributesContents,
 	}
 )
 
