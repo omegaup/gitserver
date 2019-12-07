@@ -452,7 +452,7 @@ func parseTestplan(
 		}
 
 		caseName := tokens[1]
-		weight, err := common.ParseRational(tokens[2])
+		weight, err := base.ParseRational(tokens[2])
 		if err != nil {
 			return base.ErrorWithCategory(
 				ErrInvalidTestplan,

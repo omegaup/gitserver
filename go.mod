@@ -9,9 +9,9 @@ require (
 	github.com/lhchavez/git2go v0.0.0-20190221190548-e9c961d8b627
 	github.com/mattn/go-sqlite3 v2.0.1+incompatible
 	github.com/o1egl/paseto v1.0.0
-	github.com/omegaup/githttp v0.0.0-20191207020847-2d835e097af7
-	github.com/omegaup/go-base v0.0.0-20190624033755-26f895597739
-	github.com/omegaup/quark v1.1.22
+	github.com/omegaup/githttp v0.0.0-20191207042005-b900b5a299a2
+	github.com/omegaup/go-base v0.0.0-20191207155839-a2f061e96808
+	github.com/omegaup/quark v1.1.23
 	github.com/pkg/errors v0.8.1
 	github.com/prometheus/client_golang v1.2.1
 	github.com/saintfish/chardet v0.0.0-20120816061221-3af4cd4741ca
