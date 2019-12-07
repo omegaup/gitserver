@@ -4,7 +4,7 @@ import (
 	"context"
 	"flag"
 	"fmt"
-	"github.com/coreos/go-systemd/daemon"
+	"github.com/coreos/go-systemd/v22/daemon"
 	"github.com/inconshreveable/log15"
 	git "github.com/lhchavez/git2go"
 	"github.com/omegaup/githttp"
