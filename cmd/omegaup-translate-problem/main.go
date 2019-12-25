@@ -6,6 +6,11 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
+	"io/ioutil"
+	"os"
+	"path"
+	"strings"
+
 	"github.com/inconshreveable/log15"
 	git "github.com/lhchavez/git2go"
 	"github.com/omegaup/githttp"
@@ -13,10 +18,6 @@ import (
 	"github.com/omegaup/gitserver/request"
 	base "github.com/omegaup/go-base"
 	"github.com/pkg/errors"
-	"io/ioutil"
-	"os"
-	"path"
-	"strings"
 )
 
 var (
@@ -40,9 +41,21 @@ type unmergeResult struct {
 	Published             bool   `json:"published,omitempty"`
 }
 
+type originalCommit struct {
+	CommitID      string `json:"commit_id"`
+	PrivateTreeID string `json:"private_tree_id"`
+}
+
+var _ fmt.Stringer = (*originalCommit)(nil)
+
+func (c *originalCommit) String() string {
+	return fmt.Sprintf("{CommitID: %q, PrivateTreeID: %q}", c.CommitID, c.PrivateTreeID)
+}
+
 type unmergeReport struct {
 	CommitMapping        map[string]string `json:"commit_mapping,omitempty"`
 	PrivateTreeIDMapping map[string]string `json:"private_tree_id_mapping,omitempty"`
+	OriginalCommits      []*originalCommit `json:"original_commits,omitempty"`
 }
 
 func createPackfileFromSplitCommit(
@@ -555,6 +568,7 @@ func unmergeRepository(
 		CommitMapping:        make(map[string]string),
 		PrivateTreeIDMapping: make(map[string]string),
 	}
+	lastPrivateTreeID := ""
 	for _, commit := range commits {
 		results, err := createPackfileFromMergedCommit(sourceRepo, destRepo, commit, ignoreCommitter, log)
 		if err != nil {
@@ -568,7 +582,15 @@ func unmergeRepository(
 			report.CommitMapping[result.OriginalCommitID] = result.NewCommitID
 			if result.NewPrivateTreeID != "" {
 				report.PrivateTreeIDMapping[result.OriginalPrivateTreeID] = result.NewPrivateTreeID
+				lastPrivateTreeID = result.OriginalPrivateTreeID
 			}
+			report.OriginalCommits = append(
+				report.OriginalCommits,
+				&originalCommit{
+					CommitID:      result.OriginalCommitID,
+					PrivateTreeID: lastPrivateTreeID,
+				},
+			)
 		}
 	}
 
@@ -626,7 +648,7 @@ func main() {
 		}
 
 		encoder := json.NewEncoder(f)
-		encoder.SetIndent("  ", "  ")
+		encoder.SetIndent("", "  ")
 		if err := encoder.Encode(report); err != nil {
 			log.Crit(
 				"failed to marshal report",

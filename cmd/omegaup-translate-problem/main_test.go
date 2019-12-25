@@ -1,12 +1,13 @@
 package main
 
 import (
-	base "github.com/omegaup/go-base"
 	"io/ioutil"
 	"os"
 	"path"
 	"reflect"
 	"testing"
+
+	base "github.com/omegaup/go-base"
 )
 
 func TestRoundtrip(t *testing.T) {
@@ -40,6 +41,20 @@ func TestRoundtrip(t *testing.T) {
 		PrivateTreeIDMapping: map[string]string{
 			"f681044ac3f5618ca2e5de47fd264dc31fcd651e": "f681044ac3f5618ca2e5de47fd264dc31fcd651e",
 			"2eb4e541a48b5cb01cbe4e0151e3c318bb4ad0cf": "2eb4e541a48b5cb01cbe4e0151e3c318bb4ad0cf",
+		},
+		OriginalCommits: []*originalCommit{
+			{
+				CommitID:      "c2be64797d18887307ffd39fe5334b434b3e5e3b",
+				PrivateTreeID: "f681044ac3f5618ca2e5de47fd264dc31fcd651e",
+			},
+			{
+				CommitID:      "c677d4fc0d8f68a6fb719fc8552bcee230e2be45",
+				PrivateTreeID: "f681044ac3f5618ca2e5de47fd264dc31fcd651e",
+			},
+			{
+				CommitID:      "10378fcb2306a5b7876afeb9efda074066887fb0",
+				PrivateTreeID: "2eb4e541a48b5cb01cbe4e0151e3c318bb4ad0cf",
+			},
 		},
 	}
 
