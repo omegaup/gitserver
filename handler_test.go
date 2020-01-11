@@ -384,7 +384,7 @@ func TestDelete(t *testing.T) {
 		push(
 			t,
 			tmpDir,
-			userAuthorization,
+			editorAuthorization,
 			problemAlias,
 			"refs/changes/initial",
 			&git.Oid{}, newOid,
