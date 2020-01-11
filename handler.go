@@ -1494,9 +1494,9 @@ func (p *gitProtocol) validateUpdate(
 	}
 
 	if command.ReferenceName == "refs/heads/master" {
-		if !requestContext.Request.IsAdmin {
+		if !requestContext.Request.CanEdit {
 			p.log.Error(
-				"cannot modify reference due to being non-admin",
+				"cannot modify reference due to not having permissions",
 				"ref", command.ReferenceName,
 				"request", requestContext.Request,
 			)
@@ -1512,9 +1512,9 @@ func (p *gitProtocol) validateUpdate(
 			p.log,
 		)
 	} else if command.ReferenceName == "refs/heads/published" {
-		if !requestContext.Request.IsAdmin {
+		if !requestContext.Request.CanEdit {
 			p.log.Error(
-				"cannot modify reference due to being non-admin",
+				"cannot modify reference due to not having permissions",
 				"ref", command.ReferenceName,
 				"request", requestContext.Request,
 			)

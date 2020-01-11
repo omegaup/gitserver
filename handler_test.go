@@ -29,6 +29,7 @@ import (
 
 const (
 	userAuthorization     = "Basic dXNlcjp1c2Vy"
+	editorAuthorization   = "Basic ZWRpdG9yOmVkaXRvcg=="
 	adminAuthorization    = "Basic YWRtaW46YWRtaW4="
 	readonlyAuthorization = "Basic cmVhZG9ubHk6cmVhZG9ubHk="
 )
@@ -63,9 +64,13 @@ func authorize(
 		requestContext.Request.CanEdit = true
 		return githttp.AuthorizationAllowed, username
 	}
-	if username == "user" {
+	if username == "editor" {
 		requestContext.Request.CanView = true
 		requestContext.Request.CanEdit = true
+		return githttp.AuthorizationAllowedRestricted, username
+	}
+	if username == "user" {
+		requestContext.Request.CanView = true
 		return githttp.AuthorizationAllowedRestricted, username
 	}
 	if username == "readonly" {
@@ -214,6 +219,7 @@ func push(
 	expectedResponse []githttp.PktLineResponse,
 	ts *httptest.Server,
 ) {
+	t.Helper()
 	var inBuf bytes.Buffer
 
 	{
@@ -454,7 +460,7 @@ func TestServerCreateReview(t *testing.T) {
 		push(
 			t,
 			tmpDir,
-			userAuthorization,
+			editorAuthorization,
 			problemAlias,
 			"refs/changes/initial",
 			&git.Oid{}, newOid,
@@ -469,7 +475,7 @@ func TestServerCreateReview(t *testing.T) {
 
 	// Try a few invalid publish paths
 	{
-		// User is not an administrator, so they cannot change refs/heads/master.
+		// User is not an editor, so they cannot change refs/heads/master.
 		push(
 			t,
 			tmpDir,
@@ -485,7 +491,7 @@ func TestServerCreateReview(t *testing.T) {
 			},
 			ts,
 		)
-		// User is not an administrator, so they cannot change refs/heads/published.
+		// User is not an editor, so they cannot change refs/heads/published.
 		push(
 			t,
 			tmpDir,
@@ -573,7 +579,7 @@ func TestServerCreateReview(t *testing.T) {
 		push(
 			t,
 			tmpDir,
-			userAuthorization,
+			editorAuthorization,
 			problemAlias,
 			"refs/changes/initial2",
 			&git.Oid{}, newOid,
@@ -600,7 +606,7 @@ func TestServerCreateReview(t *testing.T) {
 		push(
 			t,
 			tmpDir,
-			userAuthorization,
+			editorAuthorization,
 			problemAlias,
 			"refs/meta/review",
 			getReference(t, problemAlias, "refs/meta/review", ts),
@@ -627,7 +633,7 @@ func TestServerCreateReview(t *testing.T) {
 		push(
 			t,
 			tmpDir,
-			userAuthorization,
+			editorAuthorization,
 			problemAlias,
 			"refs/meta/review",
 			getReference(t, problemAlias, "refs/meta/review", ts),
@@ -654,7 +660,7 @@ func TestServerCreateReview(t *testing.T) {
 		push(
 			t,
 			tmpDir,
-			userAuthorization,
+			editorAuthorization,
 			problemAlias,
 			"refs/meta/review",
 			getReference(t, problemAlias, "refs/meta/review", ts),
@@ -682,7 +688,7 @@ func TestServerCreateReview(t *testing.T) {
 		push(
 			t,
 			tmpDir,
-			userAuthorization,
+			editorAuthorization,
 			problemAlias,
 			"refs/meta/review",
 			getReference(t, problemAlias, "refs/meta/review", ts),
@@ -709,7 +715,7 @@ func TestServerCreateReview(t *testing.T) {
 		push(
 			t,
 			tmpDir,
-			userAuthorization,
+			editorAuthorization,
 			problemAlias,
 			"refs/meta/review",
 			getReference(t, problemAlias, "refs/meta/review", ts),
@@ -736,7 +742,7 @@ func TestServerCreateReview(t *testing.T) {
 		push(
 			t,
 			tmpDir,
-			userAuthorization,
+			editorAuthorization,
 			problemAlias,
 			"refs/meta/review",
 			getReference(t, problemAlias, "refs/meta/review", ts),
@@ -763,7 +769,7 @@ func TestServerCreateReview(t *testing.T) {
 		push(
 			t,
 			tmpDir,
-			userAuthorization,
+			editorAuthorization,
 			problemAlias,
 			"refs/meta/review",
 			getReference(t, problemAlias, "refs/meta/review", ts),
@@ -791,7 +797,7 @@ func TestServerCreateReview(t *testing.T) {
 		push(
 			t,
 			tmpDir,
-			userAuthorization,
+			editorAuthorization,
 			problemAlias,
 			"refs/meta/review",
 			getReference(t, problemAlias, "refs/meta/review", ts),
@@ -825,7 +831,7 @@ func TestServerCreateReview(t *testing.T) {
 		push(
 			t,
 			tmpDir,
-			userAuthorization,
+			editorAuthorization,
 			problemAlias,
 			"refs/meta/review",
 			getReference(t, problemAlias, "refs/meta/review", ts),
@@ -853,7 +859,7 @@ func TestServerCreateReview(t *testing.T) {
 		push(
 			t,
 			tmpDir,
-			userAuthorization,
+			editorAuthorization,
 			problemAlias,
 			"refs/meta/review",
 			getReference(t, problemAlias, "refs/meta/review", ts),
@@ -881,7 +887,7 @@ func TestServerCreateReview(t *testing.T) {
 		push(
 			t,
 			tmpDir,
-			userAuthorization,
+			editorAuthorization,
 			problemAlias,
 			"refs/meta/review",
 			getReference(t, problemAlias, "refs/meta/review", ts),
@@ -909,7 +915,7 @@ func TestServerCreateReview(t *testing.T) {
 		push(
 			t,
 			tmpDir,
-			userAuthorization,
+			editorAuthorization,
 			problemAlias,
 			"refs/meta/review",
 			getReference(t, problemAlias, "refs/meta/review", ts),
@@ -937,7 +943,7 @@ func TestServerCreateReview(t *testing.T) {
 		push(
 			t,
 			tmpDir,
-			userAuthorization,
+			editorAuthorization,
 			problemAlias,
 			"refs/meta/review",
 			getReference(t, problemAlias, "refs/meta/review", ts),
@@ -965,7 +971,7 @@ func TestServerCreateReview(t *testing.T) {
 		push(
 			t,
 			tmpDir,
-			userAuthorization,
+			editorAuthorization,
 			problemAlias,
 			"refs/meta/review",
 			getReference(t, problemAlias, "refs/meta/review", ts),
@@ -993,7 +999,7 @@ func TestServerCreateReview(t *testing.T) {
 		push(
 			t,
 			tmpDir,
-			userAuthorization,
+			editorAuthorization,
 			problemAlias,
 			"refs/meta/review",
 			getReference(t, problemAlias, "refs/meta/review", ts),
@@ -1021,7 +1027,7 @@ func TestServerCreateReview(t *testing.T) {
 		push(
 			t,
 			tmpDir,
-			userAuthorization,
+			editorAuthorization,
 			problemAlias,
 			"refs/meta/review",
 			getReference(t, problemAlias, "refs/meta/review", ts),
@@ -1049,7 +1055,7 @@ func TestServerCreateReview(t *testing.T) {
 		push(
 			t,
 			tmpDir,
-			userAuthorization,
+			editorAuthorization,
 			problemAlias,
 			"refs/meta/review",
 			getReference(t, problemAlias, "refs/meta/review", ts),
@@ -1077,7 +1083,7 @@ func TestServerCreateReview(t *testing.T) {
 		push(
 			t,
 			tmpDir,
-			userAuthorization,
+			editorAuthorization,
 			problemAlias,
 			"refs/meta/review",
 			getReference(t, problemAlias, "refs/meta/review", ts),
@@ -1110,7 +1116,7 @@ func TestServerCreateReview(t *testing.T) {
 		push(
 			t,
 			tmpDir,
-			userAuthorization,
+			editorAuthorization,
 			problemAlias,
 			"refs/meta/review",
 			getReference(t, problemAlias, "refs/meta/review", ts),
@@ -1143,7 +1149,7 @@ func TestServerCreateReview(t *testing.T) {
 		push(
 			t,
 			tmpDir,
-			userAuthorization,
+			editorAuthorization,
 			problemAlias,
 			"refs/meta/review",
 			getReference(t, problemAlias, "refs/meta/review", ts),
@@ -1300,7 +1306,7 @@ func TestPushGitbomb(t *testing.T) {
 	push(
 		t,
 		tmpDir,
-		userAuthorization,
+		editorAuthorization,
 		problemAlias,
 		"refs/changes/initial",
 		&git.Oid{}, newCommitID,
@@ -1362,7 +1368,7 @@ func TestConfig(t *testing.T) {
 	push(
 		t,
 		tmpDir,
-		userAuthorization,
+		editorAuthorization,
 		problemAlias,
 		"refs/meta/config",
 		oldOid, newOid,
