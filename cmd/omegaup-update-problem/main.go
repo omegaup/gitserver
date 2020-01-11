@@ -66,9 +66,11 @@ func commitZipFile(
 ) (*gitserver.UpdateResult, error) {
 	ctx := request.NewContext(context.Background(), &base.NoOpMetrics{})
 	requestContext := request.FromContext(ctx)
-	requestContext.IsAdmin = true
-	requestContext.CanView = true
-	requestContext.CanEdit = true
+	requestContext.Request.Username = authorUsername
+	requestContext.Request.ProblemName = path.Base(repo.Path())
+	requestContext.Request.IsAdmin = true
+	requestContext.Request.CanView = true
+	requestContext.Request.CanEdit = true
 
 	protocol := gitserver.NewGitProtocol(
 		nil,
@@ -287,9 +289,11 @@ func commitBlobs(
 
 	ctx := request.NewContext(context.Background(), &base.NoOpMetrics{})
 	requestContext := request.FromContext(ctx)
-	requestContext.IsAdmin = true
-	requestContext.CanView = true
-	requestContext.CanEdit = true
+	requestContext.Request.Username = authorUsername
+	requestContext.Request.ProblemName = path.Base(repo.Path())
+	requestContext.Request.IsAdmin = true
+	requestContext.Request.CanView = true
+	requestContext.Request.CanEdit = true
 
 	protocol := gitserver.NewGitProtocol(
 		nil,

@@ -305,17 +305,19 @@ func (a *omegaupAuthorization) authorize(
 	}
 
 	requestContext := request.FromContext(ctx)
+	requestContext.Request.ProblemName = problem
+	requestContext.Request.Username = username
 	if username == "omegaup:system" || *insecureSkipAuthorization {
 		// This is the frontend, and we trust it completely.
-		requestContext.IsAdmin = true
-		requestContext.CanView = true
-		requestContext.CanEdit = true
-	} else if requestContext.Create {
+		requestContext.Request.IsAdmin = true
+		requestContext.Request.CanView = true
+		requestContext.Request.CanEdit = true
+	} else if requestContext.Request.Create {
 		// This is a repository creation request. There is nothing in the database
 		// yet, so grant them all privileges.
-		requestContext.IsAdmin = true
-		requestContext.CanView = true
-		requestContext.CanEdit = true
+		requestContext.Request.IsAdmin = true
+		requestContext.Request.CanView = true
+		requestContext.Request.CanEdit = true
 	} else {
 		auth, err := a.getAuthorizationFromFrontend(
 			username,
@@ -331,10 +333,10 @@ func (a *omegaupAuthorization) authorize(
 			)
 			return githttp.AuthorizationDenied, username
 		}
-		requestContext.HasSolved = auth.HasSolved
-		requestContext.IsAdmin = auth.IsAdmin
-		requestContext.CanView = auth.CanView
-		requestContext.CanEdit = auth.CanEdit
+		requestContext.Request.HasSolved = auth.HasSolved
+		requestContext.Request.IsAdmin = auth.IsAdmin
+		requestContext.Request.CanView = auth.CanView
+		requestContext.Request.CanEdit = auth.CanEdit
 	}
 	log.Info(
 		"Auth",

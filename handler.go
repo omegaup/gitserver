@@ -545,7 +545,7 @@ func validateUpdateMaster(
 	}
 
 	requestContext := request.FromContext(ctx)
-	requestContext.ReviewRef = sourceReview
+	requestContext.Request.ReviewRef = sourceReview
 
 	tree, err := newCommit.Tree()
 	if err != nil {
@@ -1435,11 +1435,19 @@ func (p *gitProtocol) validateUpdate(
 	command *githttp.GitCommand,
 	oldCommit, newCommit *git.Commit,
 ) error {
+	requestContext := request.FromContext(ctx)
+
 	p.log.Info(
 		"Update",
 		"command", command,
+		"request", requestContext.Request,
 	)
 	if command.IsDelete() {
+		p.log.Error(
+			"deleting references is disallowed",
+			"ref", command.ReferenceName,
+			"request", requestContext.Request,
+		)
 		return githttp.ErrDeleteDisallowed
 	}
 
@@ -1447,6 +1455,11 @@ func (p *gitProtocol) validateUpdate(
 	// published branch is the one being updated.
 	if command.ReferenceName != "refs/heads/published" &&
 		!githttp.ValidateFastForward(repository, newCommit, command.Reference) {
+		p.log.Error(
+			"non-fast-forward is not allowed for this branch",
+			"ref", command.ReferenceName,
+			"request", requestContext.Request,
+		)
 		return githttp.ErrNonFastForward
 	}
 
@@ -1459,6 +1472,11 @@ func (p *gitProtocol) validateUpdate(
 		command.ReferenceName != "refs/meta/config" &&
 		command.ReferenceName != "refs/meta/review" &&
 		!strings.HasPrefix(command.ReferenceName, "refs/changes/") {
+		p.log.Error(
+			"invalid reference",
+			"ref", command.ReferenceName,
+			"request", requestContext.Request,
+		)
 		return githttp.ErrInvalidRef
 	}
 
@@ -1467,12 +1485,21 @@ func (p *gitProtocol) validateUpdate(
 	if command.ReferenceName == "refs/heads/public" ||
 		command.ReferenceName == "refs/heads/protected" ||
 		command.ReferenceName == "refs/heads/private" {
+		p.log.Error(
+			"read-only reference",
+			"ref", command.ReferenceName,
+			"request", requestContext.Request,
+		)
 		return githttp.ErrReadOnlyRef
 	}
 
-	requestContext := request.FromContext(ctx)
 	if command.ReferenceName == "refs/heads/master" {
-		if !requestContext.IsAdmin {
+		if !requestContext.Request.IsAdmin {
+			p.log.Error(
+				"cannot modify reference due to being non-admin",
+				"ref", command.ReferenceName,
+				"request", requestContext.Request,
+			)
 			return githttp.ErrForbidden
 		}
 		return validateUpdateMaster(
@@ -1485,23 +1512,43 @@ func (p *gitProtocol) validateUpdate(
 			p.log,
 		)
 	} else if command.ReferenceName == "refs/heads/published" {
-		if !requestContext.IsAdmin {
+		if !requestContext.Request.IsAdmin {
+			p.log.Error(
+				"cannot modify reference due to being non-admin",
+				"ref", command.ReferenceName,
+				"request", requestContext.Request,
+			)
 			return githttp.ErrForbidden
 		}
 		return validateUpdatePublished(repository, newCommit)
 	} else if command.ReferenceName == "refs/meta/config" {
-		if !requestContext.IsAdmin {
+		if !requestContext.Request.IsAdmin {
+			p.log.Error(
+				"cannot modify reference due to being non-admin",
+				"ref", command.ReferenceName,
+				"request", requestContext.Request,
+			)
 			return githttp.ErrForbidden
 		}
 		return p.validateUpdateConfig(repository, oldCommit, newCommit)
 	} else if command.ReferenceName == "refs/meta/review" {
-		if !requestContext.CanEdit && !requestContext.HasSolved {
+		if !requestContext.Request.CanEdit && !requestContext.Request.HasSolved {
+			p.log.Error(
+				"cannot modify reference due to not having permissions",
+				"ref", command.ReferenceName,
+				"request", requestContext.Request,
+			)
 			return githttp.ErrForbidden
 		}
 		return validateUpdateReview(repository, oldCommit, newCommit)
 	}
 
-	if !requestContext.CanEdit && !requestContext.HasSolved {
+	if !requestContext.Request.CanEdit && !requestContext.Request.HasSolved {
+		p.log.Error(
+			"cannot modify reference due to not having permissions",
+			"ref", command.ReferenceName,
+			"request", requestContext.Request,
+		)
 		return githttp.ErrForbidden
 	}
 	return p.validateChange(repository, oldCommit, newCommit)
@@ -1597,7 +1644,7 @@ func (p *gitProtocol) preprocessMaster(
 	p.log.Info("Updating ref", "ref", masterRef, "err", err, "masterCommit", masterCommit)
 
 	requestContext := request.FromContext(ctx)
-	reviewRef := requestContext.ReviewRef
+	reviewRef := requestContext.Request.ReviewRef
 	commitMessageTag := ""
 	if reviewRef != "" {
 		commitMessageTag = fmt.Sprintf("Reviewed-In: %s", reviewRef)

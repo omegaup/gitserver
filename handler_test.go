@@ -55,19 +55,21 @@ func authorize(
 	}
 
 	requestContext := request.FromContext(ctx)
+	requestContext.Request.Username = username
+	requestContext.Request.ProblemName = repositoryName
 	if username == "admin" {
-		requestContext.IsAdmin = true
-		requestContext.CanView = true
-		requestContext.CanEdit = true
+		requestContext.Request.IsAdmin = true
+		requestContext.Request.CanView = true
+		requestContext.Request.CanEdit = true
 		return githttp.AuthorizationAllowed, username
 	}
 	if username == "user" {
-		requestContext.CanView = true
-		requestContext.CanEdit = true
+		requestContext.Request.CanView = true
+		requestContext.Request.CanEdit = true
 		return githttp.AuthorizationAllowedRestricted, username
 	}
 	if username == "readonly" {
-		requestContext.CanView = true
+		requestContext.Request.CanView = true
 		return githttp.AuthorizationAllowedReadOnly, username
 	}
 	w.WriteHeader(http.StatusForbidden)

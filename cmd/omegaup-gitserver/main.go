@@ -45,17 +45,17 @@ func referenceDiscovery(
 	referenceName string,
 ) bool {
 	requestContext := request.FromContext(ctx)
-	if requestContext.CanEdit {
+	if requestContext.Request.CanEdit {
 		return true
 	}
-	if requestContext.HasSolved {
+	if requestContext.Request.HasSolved {
 		// Solvers can also view the protected branch
 		if referenceName == "refs/heads/protected" {
 			return true
 		}
 	}
 
-	if requestContext.CanView {
+	if requestContext.Request.CanView {
 		// Public problems can be viewed by anyone.
 		if referenceName == "refs/heads/public" {
 			return true

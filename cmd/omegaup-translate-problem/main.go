@@ -389,10 +389,10 @@ func createPackfileFromMergedCommit(
 
 	ctx := request.NewContext(context.Background(), nil)
 	requestCtx := request.FromContext(ctx)
-	requestCtx.Create = false
-	requestCtx.IsAdmin = true
-	requestCtx.CanView = true
-	requestCtx.CanEdit = true
+	requestCtx.Request.Create = false
+	requestCtx.Request.IsAdmin = true
+	requestCtx.Request.CanView = true
+	requestCtx.Request.CanEdit = true
 
 	updatedRefs, err, unpackErr := protocol.PushPackfile(
 		ctx,
