@@ -581,14 +581,14 @@ func unmergeRepository(
 		for _, result := range results {
 			report.CommitMapping[result.OriginalCommitID] = result.NewCommitID
 			if result.NewPrivateTreeID != "" {
-				report.PrivateTreeIDMapping[result.OriginalPrivateTreeID] = result.NewPrivateTreeID
-				lastPrivateTreeID = result.OriginalPrivateTreeID
+				lastPrivateTreeID = result.NewPrivateTreeID
 			}
+			report.PrivateTreeIDMapping[result.OriginalPrivateTreeID] = lastPrivateTreeID
 			report.OriginalCommits = append(
 				report.OriginalCommits,
 				&originalCommit{
 					CommitID:      result.OriginalCommitID,
-					PrivateTreeID: lastPrivateTreeID,
+					PrivateTreeID: result.OriginalPrivateTreeID,
 				},
 			)
 		}
