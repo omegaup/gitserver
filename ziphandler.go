@@ -7,13 +7,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/inconshreveable/log15"
-	git "github.com/lhchavez/git2go"
-	"github.com/omegaup/githttp"
-	"github.com/omegaup/gitserver/request"
-	base "github.com/omegaup/go-base"
-	"github.com/omegaup/quark/common"
-	"github.com/pkg/errors"
 	"io"
 	"io/ioutil"
 	"math/big"
@@ -26,6 +19,14 @@ import (
 	"sort"
 	"strings"
 	"time"
+
+	"github.com/inconshreveable/log15"
+	git "github.com/lhchavez/git2go/v29"
+	"github.com/omegaup/githttp"
+	"github.com/omegaup/gitserver/request"
+	base "github.com/omegaup/go-base"
+	"github.com/omegaup/quark/common"
+	"github.com/pkg/errors"
 )
 
 const (

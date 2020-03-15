@@ -3,18 +3,19 @@ package main
 import (
 	"archive/zip"
 	"bytes"
-	"github.com/inconshreveable/log15"
-	git "github.com/lhchavez/git2go"
-	"github.com/omegaup/githttp"
-	"github.com/omegaup/gitserver"
-	"github.com/omegaup/gitserver/gitservertest"
-	base "github.com/omegaup/go-base"
 	"io"
 	"io/ioutil"
 	"os"
 	"reflect"
 	"strings"
 	"testing"
+
+	"github.com/inconshreveable/log15"
+	git "github.com/lhchavez/git2go/v29"
+	"github.com/omegaup/githttp"
+	"github.com/omegaup/gitserver"
+	"github.com/omegaup/gitserver/gitservertest"
+	base "github.com/omegaup/go-base"
 )
 
 func getTreeOid(t *testing.T, extraFileContents map[string]io.Reader, log log15.Logger) *git.Oid {

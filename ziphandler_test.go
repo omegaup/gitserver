@@ -5,10 +5,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	git "github.com/lhchavez/git2go"
-	"github.com/omegaup/gitserver/gitservertest"
-	base "github.com/omegaup/go-base"
-	"github.com/omegaup/quark/common"
 	"io"
 	"io/ioutil"
 	"mime/multipart"
@@ -21,6 +17,11 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	git "github.com/lhchavez/git2go/v29"
+	"github.com/omegaup/gitserver/gitservertest"
+	base "github.com/omegaup/go-base"
+	"github.com/omegaup/quark/common"
 )
 
 func wrapReaders(contents map[string]string) map[string]io.Reader {

@@ -6,13 +6,6 @@ import (
 	"encoding/json"
 	stderrors "errors"
 	"fmt"
-	"github.com/inconshreveable/log15"
-	git "github.com/lhchavez/git2go"
-	"github.com/omegaup/githttp"
-	"github.com/omegaup/gitserver/request"
-	base "github.com/omegaup/go-base"
-	"github.com/omegaup/quark/common"
-	"github.com/pkg/errors"
 	"math"
 	"math/big"
 	"net/http"
@@ -24,6 +17,14 @@ import (
 	"strings"
 	"time"
 	"unicode/utf8"
+
+	"github.com/inconshreveable/log15"
+	git "github.com/lhchavez/git2go/v29"
+	"github.com/omegaup/githttp"
+	"github.com/omegaup/gitserver/request"
+	base "github.com/omegaup/go-base"
+	"github.com/omegaup/quark/common"
+	"github.com/pkg/errors"
 )
 
 const (
@@ -1753,6 +1754,16 @@ func InitRepository(
 	}
 	defer repoConfig.Free()
 
+	if err := repoConfig.SetBool("core.multiPackIndex", true); err != nil {
+		return nil, base.ErrorWithCategory(
+			ErrInternalGit,
+			errors.Wrapf(
+				err,
+				"failed to enable support for multi-pack-index for repository at %s",
+				repositoryPath,
+			),
+		)
+	}
 	if err := repoConfig.SetInt32("pack.deltaCacheSize", 0); err != nil {
 		return nil, base.ErrorWithCategory(
 			ErrInternalGit,

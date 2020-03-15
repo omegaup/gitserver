@@ -3,12 +3,13 @@ package main
 import (
 	"flag"
 	"fmt"
-	"github.com/inconshreveable/log15"
-	git "github.com/lhchavez/git2go"
-	base "github.com/omegaup/go-base"
 	"io"
 	"os"
 	"strings"
+
+	"github.com/inconshreveable/log15"
+	git "github.com/lhchavez/git2go/v29"
+	base "github.com/omegaup/go-base"
 )
 
 var (

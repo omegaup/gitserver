@@ -3,11 +3,12 @@ package gitserver
 import (
 	"bytes"
 	"encoding/json"
+	"io"
+	"os/exec"
+
 	"github.com/inconshreveable/log15"
 	"github.com/omegaup/quark/common"
 	"github.com/pkg/errors"
-	"io"
-	"os/exec"
 )
 
 // InteractiveSettingsCompiler converts the .idl file contents and the module

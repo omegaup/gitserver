@@ -3,14 +3,15 @@ package gitserver
 import (
 	"bufio"
 	"bytes"
+	"io"
+	"unicode/utf8"
+
 	"github.com/pkg/errors"
 	"github.com/saintfish/chardet"
 	"golang.org/x/text/encoding/htmlindex"
 	"golang.org/x/text/encoding/unicode"
 	"golang.org/x/text/encoding/unicode/utf32"
 	"golang.org/x/text/transform"
-	"io"
-	"unicode/utf8"
 )
 
 var (

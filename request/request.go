@@ -2,8 +2,9 @@ package request
 
 import (
 	"context"
-	base "github.com/omegaup/go-base"
 	"io"
+
+	base "github.com/omegaup/go-base"
 )
 
 type key int

@@ -1,10 +1,11 @@
 package gitserver
 
 import (
+	"net/http"
+
 	base "github.com/omegaup/go-base"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
-	"net/http"
 )
 
 var (

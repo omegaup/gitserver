@@ -12,7 +12,7 @@ import (
 	"strings"
 
 	"github.com/inconshreveable/log15"
-	git "github.com/lhchavez/git2go"
+	git "github.com/lhchavez/git2go/v29"
 	"github.com/omegaup/githttp"
 	"github.com/omegaup/gitserver"
 	"github.com/omegaup/gitserver/request"
@@ -262,6 +262,7 @@ func mergeRepository(sourceRepositoryPath, destRepositoryPath string, log log15.
 			}
 			commits = append(commits, commit)
 
+			log.Info("commit", "id", commit.Id().String(), "parents", commit.ParentCount())
 			commit = commit.Parent(0)
 			defer commit.Free()
 
