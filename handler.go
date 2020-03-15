@@ -1753,6 +1753,16 @@ func InitRepository(
 	}
 	defer repoConfig.Free()
 
+	if err := repoConfig.SetBool("core.multiPackIndex", true); err != nil {
+		return nil, base.ErrorWithCategory(
+			ErrInternalGit,
+			errors.Wrapf(
+				err,
+				"failed to enable support for multi-pack-index for repository at %s",
+				repositoryPath,
+			),
+		)
+	}
 	if err := repoConfig.SetInt32("pack.deltaCacheSize", 0); err != nil {
 		return nil, base.ErrorWithCategory(
 			ErrInternalGit,

@@ -262,6 +262,7 @@ func mergeRepository(sourceRepositoryPath, destRepositoryPath string, log log15.
 			}
 			commits = append(commits, commit)
 
+			log.Info("commit", "id", commit.Id().String(), "parents", commit.ParentCount())
 			commit = commit.Parent(0)
 			defer commit.Free()
 
