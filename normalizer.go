@@ -92,7 +92,13 @@ func ConvertMarkdownToUTF8(r io.Reader) (io.Reader, error) {
 	}
 	bytesReader := bytes.NewReader(buf.Bytes())
 
-	// There was no BOM, so we'll need to detect the encoding in another way.
+	// Is it already valid UTF-8?
+	if utf8.Valid(buf.Bytes()) {
+		return NewLineEndingNormalizer(bytesReader), nil
+	}
+
+	// There was no BOM and it wasn't valid UTF-8, so we'll need to detect the
+	// encoding in another way.
 	detector := chardet.NewTextDetector()
 	if result, err := detector.DetectBest(buf.Bytes()); err == nil {
 		enc, err := htmlindex.Get(result.Charset)
