@@ -112,6 +112,8 @@ github.com/omegaup/githttp v1.1.0 h1:qMWpOsGjIFGMjahhG70ySOoB1otMfIb/wasJkF+P6gk
 github.com/omegaup/githttp v1.1.0/go.mod h1:XlSBQ9PW24xSwaftyBY9ScfPv+sProbsUfvDXnm6+PI=
 github.com/omegaup/githttp v1.1.1 h1:kF/zDDxaniTG1L8q4aN6hqdBkD8CcL2xVzVTyG8WL0w=
 github.com/omegaup/githttp v1.1.1/go.mod h1:ZgXGKN9orcwoMwOO8SANbLgnXhxv0rnMbVZU2RvQupI=
+github.com/omegaup/githttp v1.1.2 h1:0b66+y3zIbT/oNvcFwQ86CRhSedHQt8ucronyX2Iq6w=
+github.com/omegaup/githttp v1.1.2/go.mod h1:ZgXGKN9orcwoMwOO8SANbLgnXhxv0rnMbVZU2RvQupI=
 github.com/omegaup/go-base v0.0.0-20190624033755-26f895597739 h1:EIcs0V5rPdPbxPG9mv2uGyHDpkWO2Xw9ST8XZy3t+Rk=
 github.com/omegaup/go-base v0.0.0-20190624033755-26f895597739/go.mod h1:Ld9zYiCL9kA2+KrFVYP7baFzwQYAApOt3A3YZbmbPvE=
 github.com/omegaup/go-base v0.0.0-20191207155839-a2f061e96808 h1:5MSiF/KV5ZdOrPraqJHCSBomQjLvAPD+Uvk0zJoCmZc=
