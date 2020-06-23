@@ -119,7 +119,7 @@ var (
 			PathRegexps: []*regexp.Regexp{
 				regexp.MustCompile("^.gitattributes$"),
 				regexp.MustCompile("^.gitignore$"),
-				regexp.MustCompile("^statements(/[^/]+\\.(markdown|gif|jpe?g|png))?$"),
+				regexp.MustCompile("^statements(/[^/]+\\.(markdown|gif|jpe?g|png|svg))?$"),
 				regexp.MustCompile("^examples(/[^/]+\\.(in|out))?$"),
 				regexp.MustCompile("^interactive/Main\\.distrib\\.[a-z0-9]+$"),
 				regexp.MustCompile("^interactive/examples(/[^/]+\\.(in|out))?$"),
@@ -130,7 +130,7 @@ var (
 		{
 			ReferenceName: "refs/heads/protected",
 			PathRegexps: []*regexp.Regexp{
-				regexp.MustCompile("^solutions(/[^/]+\\.(markdown|gif|jpe?g|png|py|cpp|c|java|kp|kj))?$"),
+				regexp.MustCompile("^solutions(/[^/]+\\.(markdown|gif|jpe?g|png|svg|py|cpp|c|java|kp|kj))?$"),
 				regexp.MustCompile("^tests(/.*)?$"),
 			},
 		},
