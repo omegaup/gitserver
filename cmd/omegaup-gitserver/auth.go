@@ -8,6 +8,12 @@ import (
 	"encoding/json"
 	stderrors "errors"
 	"fmt"
+	"io/ioutil"
+	"net/http"
+	"net/url"
+	"strings"
+	"time"
+
 	_ "github.com/go-sql-driver/mysql"
 	"github.com/inconshreveable/log15"
 	_ "github.com/mattn/go-sqlite3"
@@ -17,10 +23,6 @@ import (
 	"github.com/pkg/errors"
 	"golang.org/x/crypto/argon2"
 	"golang.org/x/crypto/ed25519"
-	"net/http"
-	"net/url"
-	"strings"
-	"time"
 )
 
 var (
@@ -227,6 +229,23 @@ func (a *omegaupAuthorization) getAuthorizationFromFrontend(
 		)
 	}
 	defer response.Body.Close()
+
+	if response.StatusCode != http.StatusOK {
+		responseBody, err := ioutil.ReadAll(response.Body)
+		if err != nil {
+			return nil, errors.Wrap(
+				errors.Wrap(
+					err,
+					"failed to read response from server",
+				),
+				"failed to request permissions from the frontend",
+			)
+		}
+		return nil, errors.Errorf(
+			"failed to request permissions from the frontend: %q",
+			responseBody,
+		)
+	}
 
 	var msg authorizationProblemResponse
 	decoder := json.NewDecoder(response.Body)
