@@ -17,6 +17,7 @@ type Request struct {
 	ProblemName string
 	Username    string
 	Create      bool
+	IsSystem    bool
 	IsAdmin     bool
 	CanView     bool
 	CanEdit     bool

@@ -32,6 +32,7 @@ const (
 	userAuthorization     = "Basic dXNlcjp1c2Vy"
 	editorAuthorization   = "Basic ZWRpdG9yOmVkaXRvcg=="
 	adminAuthorization    = "Basic YWRtaW46YWRtaW4="
+	systemAuthorization   = "OmegaUpSharedSecret secret-token omegaup:system"
 	readonlyAuthorization = "Basic cmVhZG9ubHk6cmVhZG9ubHk="
 )
 
@@ -49,6 +50,17 @@ func authorize(
 	repositoryName string,
 	operation githttp.GitOperation,
 ) (githttp.AuthorizationLevel, string) {
+	if r.Header.Get("Authorization") == systemAuthorization {
+		requestContext := request.FromContext(ctx)
+		requestContext.Request.Username = "omegaup:system"
+		requestContext.Request.ProblemName = repositoryName
+		requestContext.Request.IsSystem = true
+		requestContext.Request.IsAdmin = true
+		requestContext.Request.CanView = true
+		requestContext.Request.CanEdit = true
+		return githttp.AuthorizationAllowed, "omegaup:system"
+	}
+
 	username, _, ok := r.BasicAuth()
 	if !ok {
 		w.Header().Set("WWW-Authenticate", "Basic realm=\"Git\"")
