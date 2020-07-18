@@ -49,6 +49,7 @@ type omegaupAuthorization struct {
 type authorizationProblemResponse struct {
 	Status    string `json:"status"`
 	HasSolved bool   `json:"has_solved"`
+	IsSystem  bool   `json:"is_system"`
 	IsAdmin   bool   `json:"is_admin"`
 	CanView   bool   `json:"can_view"`
 	CanEdit   bool   `json:"can_edit"`
@@ -328,6 +329,7 @@ func (a *omegaupAuthorization) authorize(
 	requestContext.Request.Username = username
 	if username == "omegaup:system" || *insecureSkipAuthorization {
 		// This is the frontend, and we trust it completely.
+		requestContext.Request.IsSystem = true
 		requestContext.Request.IsAdmin = true
 		requestContext.Request.CanView = true
 		requestContext.Request.CanEdit = true

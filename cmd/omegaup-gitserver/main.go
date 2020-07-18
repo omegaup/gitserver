@@ -87,10 +87,11 @@ func muxHandler(
 }
 
 func (h *muxGitHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	splitPath := strings.SplitN(r.URL.Path[1:], "/", 2)
+	splitPath := strings.Split(r.URL.Path[1:], "/")
 	if len(splitPath) >= 1 && splitPath[0] == "metrics" {
 		h.metricsHandler.ServeHTTP(w, r)
-	} else if len(splitPath) == 2 && splitPath[1] == "git-upload-zip" {
+	} else if len(splitPath) == 2 && splitPath[1] == "git-upload-zip" ||
+		len(splitPath) == 3 && splitPath[1] == "rename-repository" {
 		h.zipHandler.ServeHTTP(w, r)
 	} else {
 		h.gitHandler.ServeHTTP(w, r)

@@ -1396,21 +1396,11 @@ type zipUploadHandler struct {
 	log      log15.Logger
 }
 
-func (h *zipUploadHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	splitPath := strings.SplitN(r.URL.Path[1:], "/", 2)
-	if len(splitPath) != 2 {
-		w.WriteHeader(http.StatusNotFound)
-		return
-	}
-	repositoryName := splitPath[0]
-	if strings.HasPrefix(repositoryName, ".") {
-		w.WriteHeader(http.StatusNotFound)
-		return
-	}
-	if splitPath[1] != "git-upload-zip" {
-		w.WriteHeader(http.StatusNotFound)
-		return
-	}
+func (h *zipUploadHandler) handleGitUploadZip(
+	w http.ResponseWriter,
+	r *http.Request,
+	repositoryName string,
+) {
 	if r.Method != "POST" {
 		w.WriteHeader(http.StatusMethodNotAllowed)
 		return
@@ -1484,8 +1474,7 @@ func (h *zipUploadHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	repositoryPath := path.Join(h.rootPath, repositoryName)
 	h.log.Info(
-		"Request",
-		"Method", r.Method,
+		"git-upload-zip",
 		"path", repositoryPath,
 		"create", requestContext.Request.Create,
 	)
@@ -1622,6 +1611,92 @@ func (h *zipUploadHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	encoder := json.NewEncoder(w)
 	encoder.SetIndent("", "\t")
 	encoder.Encode(&updateResult)
+}
+
+func (h *zipUploadHandler) handleRenameRepository(
+	w http.ResponseWriter,
+	r *http.Request,
+	repositoryName string,
+	targetRepositoryName string,
+) {
+	if r.Method != "GET" {
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		return
+	}
+
+	ctx := request.NewContext(r.Context(), h.metrics)
+
+	repositoryPath := path.Join(h.rootPath, repositoryName)
+	targetRepositoryPath := path.Join(h.rootPath, targetRepositoryName)
+	h.log.Info(
+		"rename-repository",
+		"path", repositoryPath,
+		"target path", targetRepositoryPath,
+	)
+
+	level, _ := h.protocol.AuthCallback(ctx, w, r, repositoryName, githttp.OperationPush)
+	requestContext := request.FromContext(ctx)
+	if level != githttp.AuthorizationAllowed || !requestContext.Request.IsSystem {
+		h.log.Error(
+			"not allowed to rename repository",
+			"authorization level", level,
+			"request context", requestContext.Request,
+		)
+		w.WriteHeader(http.StatusForbidden)
+		return
+	}
+
+	if err := os.Rename(repositoryPath, targetRepositoryPath); err != nil {
+		h.log.Error("failed to rename repository", "err", err)
+		if os.IsNotExist(err) {
+		} else if os.IsExist(err) {
+			w.WriteHeader(http.StatusNotFound)
+		} else if os.IsPermission(err) {
+			w.WriteHeader(http.StatusForbidden)
+		} else {
+			w.WriteHeader(http.StatusInternalServerError)
+		}
+		return
+	}
+
+	h.log.Info(
+		"rename successful",
+		"path", repositoryPath,
+		"target path", targetRepositoryPath,
+	)
+	w.WriteHeader(http.StatusOK)
+}
+
+func (h *zipUploadHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	splitPath := strings.Split(r.URL.Path[1:], "/")
+	if len(splitPath) < 2 {
+		w.WriteHeader(http.StatusNotFound)
+		return
+	}
+	repositoryName := splitPath[0]
+	if strings.HasPrefix(repositoryName, ".") {
+		w.WriteHeader(http.StatusNotFound)
+		return
+	}
+
+	if splitPath[1] == "git-upload-zip" {
+		if len(splitPath) != 2 {
+			w.WriteHeader(http.StatusNotFound)
+			return
+		}
+		h.handleGitUploadZip(w, r, repositoryName)
+		return
+	}
+	if splitPath[1] == "rename-repository" {
+		if len(splitPath) != 3 {
+			w.WriteHeader(http.StatusNotFound)
+			return
+		}
+		h.handleRenameRepository(w, r, repositoryName, splitPath[2])
+		return
+	}
+	h.log.Error("failed to rename repository", "split path", splitPath)
+	w.WriteHeader(http.StatusNotFound)
 }
 
 // ZipHandler is the HTTP handler that allows uploading .zip files.

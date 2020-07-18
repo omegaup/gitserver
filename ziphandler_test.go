@@ -720,3 +720,108 @@ func TestUpdateProblemSettingsWithCustomValidator(t *testing.T) {
 		}
 	}
 }
+
+func TestRenameProblem(t *testing.T) {
+	tmpDir, err := ioutil.TempDir("", t.Name())
+	if err != nil {
+		t.Fatalf("Failed to create directory: %v", err)
+	}
+	if os.Getenv("PRESERVE") == "" {
+		defer os.RemoveAll(tmpDir)
+	}
+
+	log := base.StderrLog()
+	ts := httptest.NewServer(ZipHandler(
+		tmpDir,
+		NewGitProtocol(authorize, nil, true, OverallWallTimeHardLimit, fakeInteractiveSettingsCompiler, log),
+		&base.NoOpMetrics{},
+		log,
+	))
+	defer ts.Close()
+
+	problemAlias := "sumas-validator"
+
+	// Create the problem.
+	{
+		zipContents, err := gitservertest.CreateZip(
+			map[string]io.Reader{
+				"settings.json":          strings.NewReader(gitservertest.CustomValidatorSettingsJSON),
+				"cases/0.in":             strings.NewReader("1 2\n"),
+				"cases/0.out":            strings.NewReader("3\n"),
+				"statements/es.markdown": strings.NewReader("Sumaz\n"),
+				"validator.py":           strings.NewReader("print 1\n"),
+			},
+		)
+		if err != nil {
+			t.Fatalf("Failed to create zip: %v", err)
+		}
+		postZip(
+			t,
+			adminAuthorization,
+			problemAlias,
+			nil,
+			ZipMergeStrategyTheirs,
+			zipContents,
+			"initial commit",
+			true, // create
+			true, // useMultipartFormData
+			ts,
+		)
+		if _, err := os.Stat(path.Join(tmpDir, problemAlias)); err != nil {
+			t.Fatalf("Stat on old problem repository failed: %v", err)
+		}
+	}
+
+	// Rename the problem using an admin user.
+	{
+		renameURL, err := url.Parse(ts.URL + "/" + problemAlias + "/rename-repository/renamed")
+		if err != nil {
+			t.Fatalf("Failed to parse URL: %v", err)
+		}
+		req := &http.Request{
+			URL:    renameURL,
+			Method: "GET",
+			Header: map[string][]string{
+				"Authorization": {adminAuthorization},
+			},
+		}
+		res, err := ts.Client().Do(req)
+		if err != nil {
+			t.Fatalf("Failed to rename problem: %v", err)
+		}
+		defer res.Body.Close()
+		if http.StatusForbidden != res.StatusCode {
+			t.Fatalf("Unexpected result: expected %v, got %v", http.StatusForbidden, res.StatusCode)
+		}
+	}
+
+	// Rename the problem using the system user.
+	{
+		renameURL, err := url.Parse(ts.URL + "/" + problemAlias + "/rename-repository/renamed")
+		if err != nil {
+			t.Fatalf("Failed to parse URL: %v", err)
+		}
+		req := &http.Request{
+			URL:    renameURL,
+			Method: "GET",
+			Header: map[string][]string{
+				"Authorization": {systemAuthorization},
+			},
+		}
+		res, err := ts.Client().Do(req)
+		if err != nil {
+			t.Fatalf("Failed to rename problem: %v", err)
+		}
+		defer res.Body.Close()
+		if res.StatusCode != http.StatusOK {
+			t.Fatalf("Failed to rename problem: Status %v, headers: %v", res.StatusCode, res.Header)
+		}
+
+		if _, err := os.Stat(path.Join(tmpDir, problemAlias)); !os.IsNotExist(err) {
+			t.Fatalf("Stat on old problem repository failed: %v", err)
+		}
+		if _, err := os.Stat(path.Join(tmpDir, "renamed")); err != nil {
+			t.Fatalf("Stat on new problem repository failed: %v", err)
+		}
+	}
+}
