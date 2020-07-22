@@ -102,6 +102,10 @@ var (
 	// ErrNoStatements is returned if the problem does not have any statements.
 	ErrNoStatements = stderrors.New("no-statements")
 
+	// ErrNoEsStatement is returned if the problem does not have the default
+	// Spanish statement.
+	ErrNoEsStatement = stderrors.New("no-es-statement")
+
 	// ErrSlowRejected is returned if the maximum runtime would exceed the hard
 	// limit.
 	ErrSlowRejected = stderrors.New("slow-rejected")
@@ -560,6 +564,39 @@ func validateUpdateMaster(
 		)
 	}
 	defer tree.Free()
+
+	// Statements.
+	statementsTreeEntry := tree.EntryByName("statements")
+	if statementsTreeEntry == nil {
+		return ErrNoStatements
+	}
+	if statementsTreeEntry.Type != git.ObjectTree {
+		return base.ErrorWithCategory(
+			ErrNoStatements,
+			errors.New("statements/ directory is not a tree"),
+		)
+	}
+	statementsTree, err := repository.LookupTree(statementsTreeEntry.Id)
+	if err != nil {
+		return base.ErrorWithCategory(
+			ErrInternalGit,
+			errors.Wrap(
+				err,
+				"failed to lookup the statements/ tree",
+			),
+		)
+	}
+	defer statementsTree.Free()
+	statementsEsMarkdownEntry := statementsTree.EntryByName("es.markdown")
+	if statementsEsMarkdownEntry == nil {
+		return ErrNoEsStatement
+	}
+	if statementsEsMarkdownEntry.Type != git.ObjectBlob {
+		return base.ErrorWithCategory(
+			ErrNoEsStatement,
+			errors.New("statements/es.markdown is not a file"),
+		)
+	}
 
 	// Validate and re-generate the problem settings.
 	problemSettings, err := getProblemSettings(repository, tree)

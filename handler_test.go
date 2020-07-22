@@ -2173,6 +2173,100 @@ missing the end thingy`,
 	}
 }
 
+func TestStatements(t *testing.T) {
+	tmpDir, err := ioutil.TempDir("", t.Name())
+	if err != nil {
+		t.Fatalf("Failed to create directory: %v", err)
+	}
+	if os.Getenv("PRESERVE") == "" {
+		defer os.RemoveAll(tmpDir)
+	}
+
+	log := base.StderrLog()
+	ts := httptest.NewServer(GitHandler(
+		tmpDir,
+		NewGitProtocol(authorize, nil, true, OverallWallTimeHardLimit, fakeInteractiveSettingsCompiler, log),
+		&base.NoOpMetrics{},
+		log,
+	))
+	defer ts.Close()
+
+	problemAlias := "sumas"
+
+	repo, err := InitRepository(path.Join(tmpDir, problemAlias))
+	if err != nil {
+		t.Fatalf("Failed to initialize git repository: %v", err)
+	}
+	defer repo.Free()
+
+	for idx, testcase := range []struct {
+		name          string
+		extraContents map[string]io.Reader
+		status        string
+	}{
+		{
+			"statements is missing",
+			map[string]io.Reader{},
+			"ng refs/heads/master no-statements\n",
+		},
+		{
+			"statements is not a directory",
+			map[string]io.Reader{
+				"statements": strings.NewReader(""),
+			},
+			"ng refs/heads/master no-statements: statements/ directory is not a tree\n",
+		},
+		{
+			"statements/es.markdown is missing",
+			map[string]io.Reader{
+				"statements/en.markdown": strings.NewReader(""),
+			},
+			"ng refs/heads/master no-es-statement\n",
+		},
+		{
+			"statements/es.markdown is a directory",
+			map[string]io.Reader{
+				"statements/es.markdown/surprise": strings.NewReader(""),
+			},
+			"ng refs/heads/master no-es-statement: statements/es.markdown is not a file\n",
+		},
+	} {
+		t.Run(fmt.Sprintf("%d %s", idx, testcase.name), func(t *testing.T) {
+			contents := map[string]io.Reader{
+				"settings.json": strings.NewReader(gitservertest.DefaultSettingsJSON),
+				"cases/0.in":    strings.NewReader("1 2"),
+				"cases/0.out":   strings.NewReader("3"),
+			}
+			for name, r := range testcase.extraContents {
+				contents[name] = r
+			}
+			newOid, packContents := createCommit(
+				t,
+				tmpDir,
+				problemAlias,
+				&git.Oid{},
+				contents,
+				"Initial commit",
+				log,
+			)
+			push(
+				t,
+				tmpDir,
+				adminAuthorization,
+				problemAlias,
+				"refs/heads/master",
+				&git.Oid{}, newOid,
+				packContents,
+				[]githttp.PktLineResponse{
+					{Line: "unpack ok\n", Err: nil},
+					{Line: testcase.status, Err: nil},
+				},
+				ts,
+			)
+		})
+	}
+}
+
 func TestTests(t *testing.T) {
 	tmpDir, err := ioutil.TempDir("", t.Name())
 	if err != nil {
