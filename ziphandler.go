@@ -1087,6 +1087,7 @@ func ConvertZipToPackfile(
 	outCases := make(map[string]struct{})
 
 	hasStatements := false
+	hasEsStatement := false
 	if zipMergeStrategy != ZipMergeStrategyOurs {
 		for _, file := range zipReader.File {
 			zipfilePath := path.Clean(file.Name)
@@ -1143,6 +1144,9 @@ func ConvertZipToPackfile(
 			if topLevelComponent == "statements" {
 				if strings.HasSuffix(componentSubpath, ".markdown") || strings.HasSuffix(componentSubpath, ".md") {
 					hasStatements = true
+					if componentSubpath == "es.markdown" {
+						hasEsStatement = true
+					}
 				}
 			} else if topLevelComponent == "cases" {
 				caseName := strings.TrimSuffix(componentSubpath, filepath.Ext(componentSubpath))
@@ -1187,6 +1191,9 @@ func ConvertZipToPackfile(
 	// Perform a few validations.
 	if zipMergeStrategy == ZipMergeStrategyTheirs && !hasStatements {
 		return nil, ErrNoStatements
+	}
+	if zipMergeStrategy == ZipMergeStrategyTheirs && !hasEsStatement {
+		return nil, ErrNoEsStatement
 	}
 	if acceptsSubmissions {
 		for inName := range inCases {

@@ -44,6 +44,7 @@ func postZip(
 	useMultipartFormData bool,
 	ts *httptest.Server,
 ) *UpdateResult {
+	t.Helper()
 	problemSettingsString := ""
 	if problemSettings != nil {
 		problemSettingsBytes, err := json.Marshal(problemSettings)
@@ -261,6 +262,95 @@ func TestConvertZip(t *testing.T) {
 
 	if !commitOid.Equal(zipOid) {
 		t.Fatalf("Failed to create a commit. Expected %q, got %q", commitOid, zipOid)
+	}
+}
+
+func TestZiphandlerStatements(t *testing.T) {
+	tmpDir, err := ioutil.TempDir("", t.Name())
+	if err != nil {
+		t.Fatalf("Failed to create directory: %v", err)
+	}
+	if os.Getenv("PRESERVE") == "" {
+		defer os.RemoveAll(tmpDir)
+	}
+
+	problemAlias := "sumas"
+
+	repo, err := InitRepository(path.Join(tmpDir, problemAlias))
+	if err != nil {
+		t.Fatalf("Failed to initialize git repository: %v", err)
+	}
+	defer repo.Free()
+
+	log := base.StderrLog()
+
+	for idx, testcase := range []struct {
+		name          string
+		fileContents  map[string]string
+		expectedError string
+	}{
+		{
+			"missing statements/",
+			map[string]string{
+				".gitignore":     defaultGitfiles[".gitignore"],
+				".gitattributes": defaultGitfiles[".gitattributes"],
+				"cases/0.in":     "1 2\n",
+				"cases/0.out":    "3\n",
+			},
+			"no-statements",
+		},
+		{
+			"missing statements/es.markdown",
+			map[string]string{
+				".gitignore":        defaultGitfiles[".gitignore"],
+				".gitattributes":    defaultGitfiles[".gitattributes"],
+				"cases/0.in":        "1 2\n",
+				"cases/0.out":       "3\n",
+				"statements/foo.md": "",
+			},
+			"no-es-statement",
+		},
+	} {
+		t.Run(fmt.Sprintf("%d %s", idx, testcase.name), func(t *testing.T) {
+			zipContents, err := gitservertest.CreateZip(wrapReaders(testcase.fileContents))
+			if err != nil {
+				t.Fatalf("Failed to create zip: %v", err)
+			}
+			zipReader, err := zip.NewReader(bytes.NewReader(zipContents), int64(len(zipContents)))
+			if err != nil {
+				t.Fatalf("Failed to create directory: %v", err)
+			}
+
+			parent := &git.Oid{}
+			commitMessage := "Initial commit"
+
+			_, err = ConvertZipToPackfile(
+				zipReader,
+				nil,
+				ZipMergeStrategyTheirs,
+				repo,
+				parent,
+				&git.Signature{
+					Name:  "author",
+					Email: "author@test.test",
+					When:  time.Unix(0, 0).In(time.UTC),
+				},
+				&git.Signature{
+					Name:  "committer",
+					Email: "committer@test.test",
+					When:  time.Unix(0, 0).In(time.UTC),
+				},
+				commitMessage,
+				true,
+				ioutil.Discard,
+				log,
+			)
+			if err == nil {
+				t.Errorf("Expected to fail converting .zip, but didn't")
+			} else if err.Error() != testcase.expectedError {
+				t.Errorf("Expected %q, got %q", testcase.expectedError, err.Error())
+			}
+		})
 	}
 }
 
