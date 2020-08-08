@@ -143,6 +143,8 @@ libinteractive.jar
 `,
 		".gitattributes": GitAttributesContents,
 	}
+
+	casesRegexp = regexp.MustCompile("^cases/([^/]+)\\.in$")
 )
 
 func (z ZipMergeStrategy) String() string {
@@ -486,6 +488,19 @@ func parseTestplan(
 	return nil
 }
 
+// isValidProblemFile returns whether a file is considered to be part of a
+// problem layout.
+func isValidProblemFile(filename string) bool {
+	for _, commitDescription := range DefaultCommitDescriptions {
+		for _, pathRegexp := range commitDescription.PathRegexps {
+			if pathRegexp.MatchString(filename) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
 // CreatePackfile creates a packfile that contains a commit that contains the
 // specified contents plus a subset of the parent commit's tree, depending of
 // the value of zipMergeStrategy.
@@ -581,14 +596,11 @@ func CreatePackfile(
 		// Information needed to build ProblemSettings.Cases.
 		groupSettings := make(map[string]map[string]*big.Rat)
 		for filename := range contents {
-			if !strings.HasPrefix(filename, "cases/") {
+			casesMatches := casesRegexp.FindStringSubmatch(filename)
+			if casesMatches == nil {
 				continue
 			}
-			filename = strings.TrimPrefix(filename, "cases/")
-			if !strings.HasSuffix(filename, ".in") {
-				continue
-			}
-			caseName := strings.TrimSuffix(filename, ".in")
+			caseName := casesMatches[1]
 
 			addCaseName(caseName, groupSettings, big.NewRat(1, 1), false)
 		}
@@ -636,6 +648,10 @@ func CreatePackfile(
 	}
 
 	for filename, r := range contents {
+		if !isValidProblemFile(filename) {
+			continue
+		}
+
 		if strings.HasPrefix(filename, "interactive/examples/") {
 			// we move the libinteractive examples to the examples/ directory.
 			filename = strings.TrimPrefix(filename, "interactive/")
@@ -768,9 +784,10 @@ func CreatePackfile(
 				),
 			)
 		}
-		defer tree.Free()
+		treeID := tree.Id()
+		tree.Free()
 
-		if err = treebuilder.Insert(topLevelComponent, tree.Id(), 040000); err != nil {
+		if err = treebuilder.Insert(topLevelComponent, treeID, 040000); err != nil {
 			return nil, base.ErrorWithCategory(
 				ErrInternalGit,
 				errors.Wrapf(
