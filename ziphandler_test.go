@@ -375,10 +375,10 @@ func TestTestplan(t *testing.T) {
 
 	for testplanContents, expectedError := range map[string]string{
 		"0 0.0.0.0":        "invalid-testplan: invalid weight '0.0.0.0': strconv.ParseFloat: parsing \"0.0.0.0\": invalid syntax",
-		"0 invalid-weight": "invalid-testplan: .zip missing case 0",
-		"1 1":              "invalid-testplan: .zip missing case 0",
-		"0 1\n1 1":         "invalid-testplan: testplan missing case 1",
-		"0 1\n0.1 1":       "invalid-testplan: testplan missing case 0.1",
+		"0 invalid-weight": "invalid-testplan: .zip missing case \"0\"",
+		"1 1":              "invalid-testplan: .zip missing case \"0\"",
+		"0 1\n1 1":         "invalid-testplan: testplan missing case \"1\"",
+		"0 1\n0.1 1":       "invalid-testplan: testplan missing case \"0.1\"",
 	} {
 		fileContents := map[string]string{
 			".gitignore":             defaultGitfiles[".gitignore"],

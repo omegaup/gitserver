@@ -2,7 +2,6 @@ package gitserver
 
 import (
 	"archive/zip"
-	"bufio"
 	"bytes"
 	"context"
 	"encoding/json"
@@ -394,101 +393,6 @@ func hasPathPrefix(a, b []string) bool {
 	return true
 }
 
-func addCaseName(
-	caseName string,
-	groupSettings map[string]map[string]*big.Rat,
-	weight *big.Rat,
-	overwrite bool,
-) {
-	groupComponents := strings.SplitN(caseName, ".", 2)
-	groupName := groupComponents[0]
-	if _, ok := groupSettings[groupName]; !ok {
-		groupSettings[groupName] = make(map[string]*big.Rat)
-	}
-	if _, ok := groupSettings[groupName][caseName]; !ok || overwrite {
-		// Only add the weight if there is no previous entry or if it should be
-		// overwritten.
-		groupSettings[groupName][caseName] = weight
-	}
-}
-
-func symmetricDiffSettings(
-	aGroupSettings map[string]map[string]*big.Rat,
-	bGroupSettings map[string]map[string]*big.Rat,
-	leftName string,
-) error {
-	for groupName, aGroup := range aGroupSettings {
-		bGroup, ok := bGroupSettings[groupName]
-		if !ok {
-			bGroup = nil
-		}
-
-		for caseName := range aGroup {
-			if _, ok = bGroup[caseName]; !ok {
-				return base.ErrorWithCategory(
-					ErrInvalidTestplan,
-					errors.Errorf(
-						"%s missing case %s",
-						leftName,
-						caseName,
-					),
-				)
-			}
-		}
-	}
-
-	return nil
-}
-
-func parseTestplan(
-	testplan io.Reader,
-	groupSettings map[string]map[string]*big.Rat,
-	zipGroupSettings map[string]map[string]*big.Rat,
-	log log15.Logger,
-) error {
-	matcher := regexp.MustCompile("^\\s*([^#[:space:]]+)\\s+([0-9.]+)\\s*$")
-	s := bufio.NewScanner(testplan)
-
-	for s.Scan() {
-		tokens := matcher.FindStringSubmatch(s.Text())
-		if len(tokens) != 3 {
-			continue
-		}
-
-		caseName := tokens[1]
-		weight, err := base.ParseRational(tokens[2])
-		if err != nil {
-			return base.ErrorWithCategory(
-				ErrInvalidTestplan,
-				errors.Wrapf(
-					err,
-					"invalid weight '%s'",
-					tokens[2],
-				),
-			)
-		}
-
-		addCaseName(caseName, groupSettings, weight, true)
-	}
-	if err := s.Err(); err != nil {
-		return base.ErrorWithCategory(
-			ErrInvalidTestplan,
-			err,
-		)
-	}
-
-	// Validate that the files in the testplan are all present in the .zip file.
-	if err := symmetricDiffSettings(zipGroupSettings, groupSettings, ".zip"); err != nil {
-		return err
-	}
-	// ... and viceversa.
-	if err := symmetricDiffSettings(groupSettings, zipGroupSettings, "testplan"); err != nil {
-		return err
-	}
-
-	return nil
-}
-
 // isValidProblemFile returns whether a file is considered to be part of a
 // problem layout.
 func isValidProblemFile(filename string) bool {
@@ -595,7 +499,7 @@ func CreatePackfile(
 		delete(contents, "settings.json")
 
 		// Information needed to build ProblemSettings.Cases.
-		groupSettings := make(map[string]map[string]*big.Rat)
+		caseWeightMapping := common.NewCaseWeightMapping()
 		for filename := range contents {
 			casesMatches := casesRegexp.FindStringSubmatch(filename)
 			if casesMatches == nil {
@@ -603,37 +507,38 @@ func CreatePackfile(
 			}
 			caseName := casesMatches[1]
 
-			addCaseName(caseName, groupSettings, big.NewRat(1, 1), false)
+			caseWeightMapping.AddCaseName(caseName, big.NewRat(1, 1), false)
 		}
 		if r, ok := contents["testplan"]; ok {
-			zipGroupSettings := groupSettings
-			groupSettings = make(map[string]map[string]*big.Rat)
-			if err := parseTestplan(r, groupSettings, zipGroupSettings, log); err != nil {
-				// parseTestplan already wrapped the error correctly.
-				return nil, err
+			zipGroupSettings := caseWeightMapping
+			caseWeightMapping, err = common.NewCaseWeightMappingFromTestplan(r)
+			if err != nil {
+				return nil, base.ErrorWithCategory(
+					ErrInvalidTestplan,
+					err,
+				)
+			}
+
+			// Validate that the files in the testplan are all present in the .zip file.
+			if err := zipGroupSettings.SymmetricDiff(caseWeightMapping, ".zip"); err != nil {
+				return nil, base.ErrorWithCategory(
+					ErrInvalidTestplan,
+					err,
+				)
+			}
+			// ... and viceversa.
+			if err := caseWeightMapping.SymmetricDiff(zipGroupSettings, "testplan"); err != nil {
+				return nil, base.ErrorWithCategory(
+					ErrInvalidTestplan,
+					err,
+				)
 			}
 		}
 		// Remove this file since it's redundant with settings.json.
 		delete(contents, "testplan")
 
 		// Update the problem settings.
-		settings.Cases = make([]common.GroupSettings, 0)
-		for groupName, groupContents := range groupSettings {
-			var caseSettings []common.CaseSettings
-			for caseName, caseWeight := range groupContents {
-				caseSettings = append(caseSettings, common.CaseSettings{
-					Name:   caseName,
-					Weight: caseWeight,
-				})
-			}
-			sort.Sort(common.ByCaseName(caseSettings))
-
-			settings.Cases = append(settings.Cases, common.GroupSettings{
-				Name:  groupName,
-				Cases: caseSettings,
-			})
-		}
-		sort.Sort(common.ByGroupName(settings.Cases))
+		settings.Cases = caseWeightMapping.ToGroupSettings()
 	}
 
 	// libinteractive samples don't require an .out file. Generate one just for
