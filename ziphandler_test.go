@@ -1,7 +1,6 @@
 package gitserver
 
 import (
-	"archive/zip"
 	"bytes"
 	"encoding/json"
 	"fmt"
@@ -213,20 +212,14 @@ func TestConvertZip(t *testing.T) {
 		"statements/es.markdown": "Sumas\n",
 	}
 
-	zipContents, err := gitservertest.CreateZip(wrapReaders(fileContents))
-	if err != nil {
-		t.Fatalf("Failed to create zip: %v", err)
-	}
-	zipReader, err := zip.NewReader(bytes.NewReader(zipContents), int64(len(zipContents)))
-	if err != nil {
-		t.Fatalf("Failed to create directory: %v", err)
-	}
-
 	parent := &git.Oid{}
 	commitMessage := "Initial commit"
 
 	zipOid, err := ConvertZipToPackfile(
-		zipReader,
+		common.NewProblemFilesFromMap(
+			fileContents,
+			"problem.zip",
+		),
 		nil,
 		ZipMergeStrategyTheirs,
 		repo,
@@ -312,20 +305,14 @@ func TestZiphandlerStatements(t *testing.T) {
 		},
 	} {
 		t.Run(fmt.Sprintf("%d %s", idx, testcase.name), func(t *testing.T) {
-			zipContents, err := gitservertest.CreateZip(wrapReaders(testcase.fileContents))
-			if err != nil {
-				t.Fatalf("Failed to create zip: %v", err)
-			}
-			zipReader, err := zip.NewReader(bytes.NewReader(zipContents), int64(len(zipContents)))
-			if err != nil {
-				t.Fatalf("Failed to create directory: %v", err)
-			}
-
 			parent := &git.Oid{}
 			commitMessage := "Initial commit"
 
 			_, err = ConvertZipToPackfile(
-				zipReader,
+				common.NewProblemFilesFromMap(
+					testcase.fileContents,
+					"problem.zip",
+				),
 				nil,
 				ZipMergeStrategyTheirs,
 				repo,
@@ -389,20 +376,14 @@ func TestTestplan(t *testing.T) {
 			"testplan":               testplanContents,
 		}
 
-		zipContents, err := gitservertest.CreateZip(wrapReaders(fileContents))
-		if err != nil {
-			t.Fatalf("Failed to create zip: %v", err)
-		}
-		zipReader, err := zip.NewReader(bytes.NewReader(zipContents), int64(len(zipContents)))
-		if err != nil {
-			t.Fatalf("Failed to create directory: %v", err)
-		}
-
 		parent := &git.Oid{}
 		commitMessage := "Initial commit"
 
 		_, err = ConvertZipToPackfile(
-			zipReader,
+			common.NewProblemFilesFromMap(
+				fileContents,
+				"problem.zip",
+			),
 			nil,
 			ZipMergeStrategyTheirs,
 			repo,

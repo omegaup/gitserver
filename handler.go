@@ -134,7 +134,7 @@ var (
 		{
 			ReferenceName: "refs/heads/protected",
 			PathRegexps: []*regexp.Regexp{
-				regexp.MustCompile("^solutions(/[^/]+\\.(md|markdown|gif|jpe?g|png|svg|py|cpp|c|java|kp|kj|in|out))?$"),
+				regexp.MustCompile(`^solutions(/[^/]+\\.(md|markdown|gif|jpe?g|png|svg|py[23]?|cpp\w*|c|java|kp|kj|in|out))?$`),
 				regexp.MustCompile("^tests(/.*)?$"),
 			},
 		},

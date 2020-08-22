@@ -54,7 +54,7 @@ type BlobUpdate struct {
 }
 
 func commitZipFile(
-	zipReader *zip.Reader,
+	problemFiles common.ProblemFiles,
 	repo *git.Repository,
 	lockfile *githttp.Lockfile,
 	authorUsername string,
@@ -87,7 +87,7 @@ func commitZipFile(
 
 	return gitserver.PushZip(
 		ctx,
-		zipReader,
+		problemFiles,
 		githttp.AuthorizationAllowed,
 		repo,
 		lockfile,
@@ -435,7 +435,7 @@ func main() {
 		defer zipReader.Close()
 
 		updateResult, err = commitZipFile(
-			&zipReader.Reader,
+			common.NewProblemFilesFromZip(&zipReader.Reader, *zipPath),
 			repo,
 			lockfile,
 			*author,
@@ -505,7 +505,7 @@ func main() {
 		}
 
 		updateResult, err = commitZipFile(
-			zipReader,
+			common.NewProblemFilesFromZip(zipReader, ":memory:"),
 			repo,
 			lockfile,
 			*author,

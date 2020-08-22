@@ -62,24 +62,6 @@ const (
 )
 
 var (
-	topLevelEntryNames = []string{
-		// public branch:
-		"statements",
-		"examples",
-
-		// protected branch:
-		"solution",
-		"tests",
-
-		// private branch:
-		"cases",
-		"settings.json",
-		"testplan",
-
-		// public/private:
-		"interactive",
-	}
-
 	defaultGitfiles = map[string]string{
 		".gitignore": `# OS-specific resources
 .DS_Store
@@ -352,45 +334,6 @@ func GetUpdatedFiles(
 
 	sort.Sort(byPath(updatedFiles))
 	return updatedFiles, nil
-}
-
-func isTopLevelEntry(component string) bool {
-	for _, entry := range topLevelEntryNames {
-		if entry == component {
-			return true
-		}
-		if strings.HasPrefix(component, "validator.") {
-			return true
-		}
-	}
-	return false
-}
-
-func getLongestPathPrefix(zipReader *zip.Reader) []string {
-	for _, file := range zipReader.File {
-		path := path.Clean(file.Name)
-		components := strings.Split(path, "/")
-		for idx, component := range components {
-			// Whenever we see one of these directories, we know we've reached the
-			// root of the problem structure.
-			if isTopLevelEntry(component) {
-				return components[:idx]
-			}
-		}
-	}
-	return []string{}
-}
-
-func hasPathPrefix(a, b []string) bool {
-	if len(a) > len(b) {
-		return false
-	}
-	for idx, p := range a {
-		if b[idx] != p {
-			return false
-		}
-	}
-	return true
 }
 
 // isValidProblemFile returns whether a file is considered to be part of a
@@ -992,7 +935,7 @@ func getUpdatedProblemSettings(
 // ConvertZipToPackfile receives a .zip file from the caller and converts it
 // into a git packfile that can be used to update the repository.
 func ConvertZipToPackfile(
-	zipReader *zip.Reader,
+	problemFiles common.ProblemFiles,
 	settings *common.ProblemSettings,
 	zipMergeStrategy ZipMergeStrategy,
 	repo *git.Repository,
@@ -1004,7 +947,6 @@ func ConvertZipToPackfile(
 	log log15.Logger,
 ) (*git.Oid, error) {
 	contents := make(map[string]io.Reader)
-	longestPrefix := getLongestPathPrefix(zipReader)
 
 	inCases := make(map[string]struct{})
 	outCases := make(map[string]struct{})
@@ -1012,27 +954,18 @@ func ConvertZipToPackfile(
 	hasStatements := false
 	hasEsStatement := false
 	if zipMergeStrategy != ZipMergeStrategyOurs {
-		for _, file := range zipReader.File {
-			zipfilePath := path.Clean(file.Name)
+		for _, zipfilePath := range problemFiles.Files() {
 			components := strings.Split(zipfilePath, "/")
-			if len(longestPrefix) >= len(components) || !hasPathPrefix(longestPrefix, components) {
-				continue
-			}
-			// BuildTree only cares about files.
-			if file.FileInfo().IsDir() {
-				continue
-			}
 
-			topLevelComponent := components[len(longestPrefix)]
+			topLevelComponent := components[0]
 			if zipMergeStrategy == ZipMergeStrategyStatementsOurs &&
 				topLevelComponent == "statements" {
 				continue
 			}
 
 			isValidFile := false
-			trimmedZipfilePath := strings.Join(components[len(longestPrefix):], "/")
 			for _, description := range DefaultCommitDescriptions {
-				if description.ContainsPath(trimmedZipfilePath) {
+				if description.ContainsPath(zipfilePath) {
 					isValidFile = true
 					break
 				}
@@ -1040,7 +973,7 @@ func ConvertZipToPackfile(
 
 			// testplan is not going to be part of the final tree, but we still add it
 			// because it will be integrated into the settings.json file.
-			if trimmedZipfilePath == "testplan" {
+			if zipfilePath == "testplan" {
 				isValidFile = true
 			}
 
@@ -1048,7 +981,7 @@ func ConvertZipToPackfile(
 				log.Info("Skipping file", "path", zipfilePath)
 			}
 
-			zipFile, err := file.Open()
+			zipFile, err := problemFiles.Open(zipfilePath)
 			if err != nil {
 				return nil, base.ErrorWithCategory(
 					ErrInvalidZipFilename,
@@ -1062,7 +995,7 @@ func ConvertZipToPackfile(
 			defer zipFile.Close()
 			var r io.Reader = zipFile
 
-			componentSubpath := strings.Join(components[len(longestPrefix)+1:], "/")
+			componentSubpath := strings.Join(components[1:], "/")
 
 			if topLevelComponent == "statements" {
 				if strings.HasSuffix(componentSubpath, ".markdown") || strings.HasSuffix(componentSubpath, ".md") {
@@ -1080,7 +1013,7 @@ func ConvertZipToPackfile(
 				}
 			}
 
-			contents[trimmedZipfilePath] = r
+			contents[zipfilePath] = r
 		}
 	}
 
@@ -1145,7 +1078,7 @@ func ConvertZipToPackfile(
 
 	log.Info(
 		"Zip is valid",
-		"Files", zipReader.File,
+		"Files", problemFiles.Files(),
 	)
 
 	return CreatePackfile(
@@ -1162,12 +1095,12 @@ func ConvertZipToPackfile(
 	)
 }
 
-// PushZip reads the contents of the .zip file pointed at to by zipReader,
+// PushZip reads the contents of the .zip file pointed at to by problemFiles,
 // creates a packfile out of it, and pushes it to the master branch of the
 // repository.
 func PushZip(
 	ctx context.Context,
-	zipReader *zip.Reader,
+	problemFiles common.ProblemFiles,
 	authorizationLevel githttp.AuthorizationLevel,
 	repo *git.Repository,
 	lockfile *githttp.Lockfile,
@@ -1211,7 +1144,7 @@ func PushZip(
 	defer os.Remove(packfile.Name())
 
 	newOid, err := ConvertZipToPackfile(
-		zipReader,
+		problemFiles,
 		problemSettings,
 		zipMergeStrategy,
 		repo,
@@ -1507,7 +1440,10 @@ func (h *zipUploadHandler) handleGitUploadZip(
 
 	updateResult, err := PushZip(
 		ctx,
-		&zipReader.Reader,
+		common.NewProblemFilesFromZip(
+			&zipReader.Reader,
+			fmt.Sprintf("%s.zip", path.Base(repositoryPath)),
+		),
 		level,
 		repo,
 		lockfile,
