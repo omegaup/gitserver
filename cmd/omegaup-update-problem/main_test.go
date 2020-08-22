@@ -16,6 +16,7 @@ import (
 	"github.com/omegaup/gitserver"
 	"github.com/omegaup/gitserver/gitservertest"
 	base "github.com/omegaup/go-base/v2"
+	"github.com/omegaup/quark/common"
 )
 
 func getTreeOid(t *testing.T, extraFileContents map[string]io.Reader, log log15.Logger) *git.Oid {
@@ -56,7 +57,7 @@ func getTreeOid(t *testing.T, extraFileContents map[string]io.Reader, log log15.
 	defer lockfile.Unlock()
 
 	if _, err := commitZipFile(
-		zipReader,
+		common.NewProblemFilesFromZip(zipReader, ":memory:"),
 		repo,
 		lockfile,
 		"test",
@@ -230,7 +231,7 @@ func TestProblemUpdateZip(t *testing.T) {
 		}
 
 		updateResult, err := commitZipFile(
-			zipReader,
+			common.NewProblemFilesFromZip(zipReader, ":memory:"),
 			repo,
 			lockfile,
 			"test",
@@ -286,7 +287,7 @@ func TestProblemUpdateZip(t *testing.T) {
 		}
 
 		updateResult, err := commitZipFile(
-			zipReader,
+			common.NewProblemFilesFromZip(zipReader, ":memory:"),
 			repo,
 			lockfile,
 			"test",
@@ -363,7 +364,7 @@ func TestProblemUpdateBlobs(t *testing.T) {
 		}
 
 		updateResult, err := commitZipFile(
-			zipReader,
+			common.NewProblemFilesFromZip(zipReader, ":memory:"),
 			repo,
 			lockfile,
 			"test",
