@@ -12,7 +12,7 @@ import (
 	"strings"
 
 	"github.com/inconshreveable/log15"
-	git "github.com/lhchavez/git2go/v29"
+	git "github.com/lhchavez/git2go/v32"
 	"github.com/omegaup/githttp"
 	"github.com/omegaup/gitserver"
 	"github.com/omegaup/gitserver/request"
@@ -66,7 +66,7 @@ func createPackfileFromSplitCommit(
 ) error {
 	// Create the new commit object and add it to a packfile builder.
 	head, err := destRepo.Head()
-	if err != nil && !git.IsErrorCode(err, git.ErrUnbornBranch) {
+	if err != nil && !git.IsErrorCode(err, git.ErrorCodeUnbornBranch) {
 		return errors.Wrap(err, "failed to get HEAD for new repository")
 	}
 	if head != nil {
@@ -311,7 +311,7 @@ func createPackfileFromMergedCommit(
 ) ([]*unmergeResult, error) {
 	// Create the new commit object and add it to a packfile builder.
 	head, err := destRepo.Head()
-	if err != nil && !git.IsErrorCode(err, git.ErrUnbornBranch) {
+	if err != nil && !git.IsErrorCode(err, git.ErrorCodeUnbornBranch) {
 		return nil, errors.Wrap(err, "failed to get HEAD for new repository")
 	}
 	if head != nil {

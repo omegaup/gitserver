@@ -8,7 +8,7 @@ import (
 	"strings"
 
 	"github.com/inconshreveable/log15"
-	git "github.com/lhchavez/git2go/v29"
+	git "github.com/lhchavez/git2go/v32"
 	base "github.com/omegaup/go-base"
 )
 
@@ -29,9 +29,9 @@ func processOnePackfile(
 		panic(err)
 	}
 
-	indexer, err := git.NewIndexer(".", odb, func(stats git.TransferProgress) git.ErrorCode {
+	indexer, err := git.NewIndexer(".", odb, func(stats git.TransferProgress) error {
 		log.Debug("Progress", "stats", stats)
-		return git.ErrorCode(0)
+		return nil
 	})
 	if err != nil {
 		panic(err)

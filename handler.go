@@ -19,7 +19,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/inconshreveable/log15"
-	git "github.com/lhchavez/git2go/v29"
+	git "github.com/lhchavez/git2go/v32"
 	"github.com/omegaup/githttp"
 	"github.com/omegaup/gitserver/request"
 	base "github.com/omegaup/go-base"
@@ -360,7 +360,7 @@ func extractExampleCases(
 	for _, examplesDirectory := range []string{"examples", "interactive/examples"} {
 		entry, err := tree.EntryByPath(examplesDirectory)
 		if err != nil {
-			if git.IsErrorCode(err, git.ErrNotFound) {
+			if git.IsErrorCode(err, git.ErrorCodeNotFound) {
 				continue
 			}
 			return nil, base.ErrorWithCategory(
@@ -478,7 +478,7 @@ func extractExampleCases(
 
 			statementBlob, err := repository.LookupBlob(statementEntry.Id)
 			if err != nil {
-				if git.IsErrorCode(err, git.ErrNotFound) {
+				if git.IsErrorCode(err, git.ErrorCodeNotFound) {
 					continue
 				}
 				return nil, base.ErrorWithCategory(
@@ -527,7 +527,7 @@ func validateUpdateMaster(
 	for {
 		ref, err := it.Next()
 		if err != nil {
-			if git.IsErrorCode(err, git.ErrIterOver) {
+			if git.IsErrorCode(err, git.ErrorCodeIterOver) {
 				break
 			}
 			return base.ErrorWithCategory(
@@ -1415,21 +1415,19 @@ func (p *gitProtocol) validateChange(
 	}
 	defer newTree.Free()
 
-	var walkErr error
 	objectCount := 0
-	newTree.Walk(func(name string, entry *git.TreeEntry) int {
+	err = newTree.Walk(func(name string, entry *git.TreeEntry) error {
 		objectCount++
 		if objectCount > objectLimit {
 			p.log.Error(
 				"Tree exceeded object limit",
 			)
-			walkErr = ErrTooManyObjects
-			return -1
+			return ErrTooManyObjects
 		}
-		return 0
+		return nil
 	})
-	if walkErr != nil {
-		return walkErr
+	if err != nil {
+		return err
 	}
 
 	// settings.json
@@ -1622,7 +1620,7 @@ func (p *gitProtocol) preprocessMaster(
 
 		ref, err := originalRepository.References.Lookup(description.ReferenceName)
 		if err != nil {
-			if git.IsErrorCode(err, git.ErrNotFound) {
+			if git.IsErrorCode(err, git.ErrorCodeNotFound) {
 				continue
 			}
 			return originalPackPath, originalCommands, base.ErrorWithCategory(
@@ -1655,7 +1653,7 @@ func (p *gitProtocol) preprocessMaster(
 
 	masterRef, err := originalRepository.References.Lookup("refs/heads/master")
 	var masterCommit *git.Commit
-	if err != nil && !git.IsErrorCode(err, git.ErrNotFound) {
+	if err != nil && !git.IsErrorCode(err, git.ErrorCodeNotFound) {
 		return originalPackPath, originalCommands, base.ErrorWithCategory(
 			ErrInternalGit,
 			errors.Wrap(

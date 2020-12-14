@@ -21,7 +21,7 @@ import (
 	"time"
 
 	"github.com/inconshreveable/log15"
-	git "github.com/lhchavez/git2go/v29"
+	git "github.com/lhchavez/git2go/v32"
 	"github.com/omegaup/githttp"
 	"github.com/omegaup/gitserver/request"
 	base "github.com/omegaup/go-base"
@@ -233,14 +233,15 @@ func getAllFilesForCommit(
 	defer tree.Free()
 
 	commitFiles := make(map[string]*git.Oid)
-	if err := tree.Walk(func(name string, entry *git.TreeEntry) int {
+	err = tree.Walk(func(name string, entry *git.TreeEntry) error {
 		if entry.Type != git.ObjectBlob {
-			return 0
+			return nil
 		}
 		filename := path.Join(name, entry.Name)
 		commitFiles[filename] = entry.Id
-		return 0
-	}); err != nil {
+		return nil
+	})
+	if err != nil {
 		return nil, base.ErrorWithCategory(
 			ErrInternalGit,
 			errors.Wrapf(

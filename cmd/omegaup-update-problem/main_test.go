@@ -11,7 +11,7 @@ import (
 	"testing"
 
 	"github.com/inconshreveable/log15"
-	git "github.com/lhchavez/git2go/v29"
+	git "github.com/lhchavez/git2go/v32"
 	"github.com/omegaup/githttp"
 	"github.com/omegaup/gitserver"
 	"github.com/omegaup/gitserver/gitservertest"
@@ -125,7 +125,7 @@ func discoverReferences(t *testing.T, repo *git.Repository) map[string]*git.Oid 
 	for {
 		ref, err := it.Next()
 		if err != nil {
-			if git.IsErrorCode(err, git.ErrIterOver) {
+			if git.IsErrorCode(err, git.ErrorCodeIterOver) {
 				break
 			}
 			t.Fatalf("Failed to iterate references: %v", err)
