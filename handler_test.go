@@ -20,7 +20,7 @@ import (
 	"time"
 
 	"github.com/inconshreveable/log15"
-	git "github.com/lhchavez/git2go/v29"
+	git "github.com/lhchavez/git2go/v32"
 	"github.com/omegaup/githttp"
 	"github.com/omegaup/gitserver/gitservertest"
 	"github.com/omegaup/gitserver/request"

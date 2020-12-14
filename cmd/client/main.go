@@ -12,7 +12,7 @@ import (
 	"time"
 
 	"github.com/inconshreveable/log15"
-	git "github.com/lhchavez/git2go/v29"
+	git "github.com/lhchavez/git2go/v32"
 	"github.com/omegaup/githttp"
 	base "github.com/omegaup/go-base"
 	"golang.org/x/crypto/ssh"
@@ -119,7 +119,7 @@ func forcePushToBranch(remote *url.URL) error {
 
 		descendant, err := repository.DescendantOf(&oldOid, newOid)
 		if err != nil {
-			if !git.IsErrorCode(err, git.ErrNotFound) {
+			if !git.IsErrorCode(err, git.ErrorCodeNotFound) {
 				// Not found is normal. We're doing a force-push anyways.
 				descendant = false
 			} else {

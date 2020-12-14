@@ -18,7 +18,7 @@ import (
 	"testing"
 	"time"
 
-	git "github.com/lhchavez/git2go/v29"
+	git "github.com/lhchavez/git2go/v32"
 	"github.com/omegaup/gitserver/gitservertest"
 	base "github.com/omegaup/go-base"
 	"github.com/omegaup/quark/common"
