@@ -24,7 +24,7 @@ import (
 	"github.com/omegaup/githttp"
 	"github.com/omegaup/gitserver/gitservertest"
 	"github.com/omegaup/gitserver/request"
-	base "github.com/omegaup/go-base"
+	base "github.com/omegaup/go-base/v2"
 	"github.com/omegaup/quark/common"
 )
 
@@ -288,7 +288,7 @@ func TestInvalidRef(t *testing.T) {
 		defer os.RemoveAll(tmpDir)
 	}
 
-	log := base.StderrLog()
+	log := base.StderrLog(false)
 	ts := httptest.NewServer(GitHandler(
 		tmpDir,
 		NewGitProtocol(authorize, nil, false, OverallWallTimeHardLimit, fakeInteractiveSettingsCompiler, log),
@@ -360,7 +360,7 @@ func TestDelete(t *testing.T) {
 		defer os.RemoveAll(tmpDir)
 	}
 
-	log := base.StderrLog()
+	log := base.StderrLog(false)
 	ts := httptest.NewServer(GitHandler(
 		tmpDir,
 		NewGitProtocol(authorize, nil, false, OverallWallTimeHardLimit, fakeInteractiveSettingsCompiler, log),
@@ -435,7 +435,7 @@ func TestServerCreateReview(t *testing.T) {
 		defer os.RemoveAll(tmpDir)
 	}
 
-	log := base.StderrLog()
+	log := base.StderrLog(false)
 	ts := httptest.NewServer(GitHandler(
 		tmpDir,
 		NewGitProtocol(authorize, nil, false, OverallWallTimeHardLimit, fakeInteractiveSettingsCompiler, log),
@@ -1224,7 +1224,7 @@ func TestPushGitbomb(t *testing.T) {
 		defer os.RemoveAll(tmpDir)
 	}
 
-	log := base.StderrLog()
+	log := base.StderrLog(false)
 	ts := httptest.NewServer(GitHandler(
 		tmpDir,
 		NewGitProtocol(authorize, nil, false, OverallWallTimeHardLimit, fakeInteractiveSettingsCompiler, log),
@@ -1341,7 +1341,7 @@ func TestConfig(t *testing.T) {
 		defer os.RemoveAll(tmpDir)
 	}
 
-	log := base.StderrLog()
+	log := base.StderrLog(false)
 	ts := httptest.NewServer(GitHandler(
 		tmpDir,
 		NewGitProtocol(authorize, nil, false, OverallWallTimeHardLimit, fakeInteractiveSettingsCompiler, log),
@@ -1688,7 +1688,7 @@ func TestInteractive(t *testing.T) {
 		defer os.RemoveAll(tmpDir)
 	}
 
-	log := base.StderrLog()
+	log := base.StderrLog(false)
 	ts := httptest.NewServer(GitHandler(
 		tmpDir,
 		NewGitProtocol(
@@ -1857,7 +1857,7 @@ func TestExampleCases(t *testing.T) {
 		defer os.RemoveAll(tmpDir)
 	}
 
-	log := base.StderrLog()
+	log := base.StderrLog(false)
 	ts := httptest.NewServer(GitHandler(
 		tmpDir,
 		NewGitProtocol(authorize, nil, true, OverallWallTimeHardLimit, fakeInteractiveSettingsCompiler, log),
@@ -2182,7 +2182,7 @@ func TestStatements(t *testing.T) {
 		defer os.RemoveAll(tmpDir)
 	}
 
-	log := base.StderrLog()
+	log := base.StderrLog(false)
 	ts := httptest.NewServer(GitHandler(
 		tmpDir,
 		NewGitProtocol(authorize, nil, true, OverallWallTimeHardLimit, fakeInteractiveSettingsCompiler, log),
@@ -2276,7 +2276,7 @@ func TestTests(t *testing.T) {
 		defer os.RemoveAll(tmpDir)
 	}
 
-	log := base.StderrLog()
+	log := base.StderrLog(false)
 	ts := httptest.NewServer(GitHandler(
 		tmpDir,
 		NewGitProtocol(authorize, nil, true, OverallWallTimeHardLimit, fakeInteractiveSettingsCompiler, log),

@@ -15,7 +15,7 @@ import (
 	"github.com/omegaup/githttp"
 	"github.com/omegaup/gitserver"
 	"github.com/omegaup/gitserver/gitservertest"
-	base "github.com/omegaup/go-base"
+	base "github.com/omegaup/go-base/v2"
 )
 
 func getTreeOid(t *testing.T, extraFileContents map[string]io.Reader, log log15.Logger) *git.Oid {
@@ -88,7 +88,7 @@ func getTreeOid(t *testing.T, extraFileContents map[string]io.Reader, log log15.
 }
 
 func TestIdenticalTrees(t *testing.T) {
-	log := base.StderrLog()
+	log := base.StderrLog(false)
 
 	defaultSettingsTree := getTreeOid(t, map[string]io.Reader{}, log)
 
@@ -192,7 +192,7 @@ func validateReferences(
 }
 
 func TestProblemUpdateZip(t *testing.T) {
-	log := base.StderrLog()
+	log := base.StderrLog(false)
 
 	tmpdir, err := ioutil.TempDir("", "gitrepo")
 	if err != nil {
@@ -325,7 +325,7 @@ func TestProblemUpdateZip(t *testing.T) {
 }
 
 func TestProblemUpdateBlobs(t *testing.T) {
-	log := base.StderrLog()
+	log := base.StderrLog(false)
 
 	tmpdir, err := ioutil.TempDir("", "gitrepo")
 	if err != nil {

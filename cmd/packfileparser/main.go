@@ -9,7 +9,7 @@ import (
 
 	"github.com/inconshreveable/log15"
 	git "github.com/lhchavez/git2go/v32"
-	base "github.com/omegaup/go-base"
+	base "github.com/omegaup/go-base/v2"
 )
 
 var (
@@ -125,7 +125,7 @@ func processObject(repository *git.Repository, oid *git.Oid, message string) err
 
 func main() {
 	flag.Parse()
-	log = base.StderrLog()
+	log = base.StderrLog(false)
 
 	var repository *git.Repository
 	var odb *git.Odb

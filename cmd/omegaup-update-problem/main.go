@@ -19,7 +19,7 @@ import (
 	"github.com/omegaup/githttp"
 	"github.com/omegaup/gitserver"
 	"github.com/omegaup/gitserver/request"
-	base "github.com/omegaup/go-base"
+	base "github.com/omegaup/go-base/v2"
 	"github.com/omegaup/quark/common"
 	"github.com/pkg/errors"
 )
@@ -343,7 +343,7 @@ func commitBlobs(
 
 func main() {
 	flag.Parse()
-	log := base.StderrLog()
+	log := base.StderrLog(false)
 
 	if *author == "" {
 		log.Crit("author cannot be empty. Please specify one with -author")

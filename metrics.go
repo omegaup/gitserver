@@ -3,7 +3,7 @@ package gitserver
 import (
 	"net/http"
 
-	base "github.com/omegaup/go-base"
+	base "github.com/omegaup/go-base/v2"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )

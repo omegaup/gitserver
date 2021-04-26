@@ -7,7 +7,7 @@ import (
 	"reflect"
 	"testing"
 
-	base "github.com/omegaup/go-base"
+	base "github.com/omegaup/go-base/v2"
 )
 
 func TestRoundtrip(t *testing.T) {
@@ -19,7 +19,7 @@ func TestRoundtrip(t *testing.T) {
 		defer os.RemoveAll(dirName)
 	}
 
-	log := base.StderrLog()
+	log := base.StderrLog(false)
 
 	mergedPath := path.Join(dirName, "merged")
 	unmergedPath := path.Join(dirName, "unmerged")

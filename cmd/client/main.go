@@ -14,7 +14,7 @@ import (
 	"github.com/inconshreveable/log15"
 	git "github.com/lhchavez/git2go/v32"
 	"github.com/omegaup/githttp"
-	base "github.com/omegaup/go-base"
+	base "github.com/omegaup/go-base/v2"
 	"golang.org/x/crypto/ssh"
 )
 
@@ -345,7 +345,7 @@ func pushToSubdirectory(remote *url.URL) error {
 
 func main() {
 	flag.Parse()
-	log = base.StderrLog()
+	log = base.StderrLog(false)
 
 	if *commitHash == "" {
 		panic(errors.New("Must provide a -commit flag"))

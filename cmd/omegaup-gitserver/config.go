@@ -15,6 +15,7 @@ type DbConfig struct {
 type LoggingConfig struct {
 	File  string
 	Level string
+	JSON  bool
 }
 
 // GitserverConfig represents the configuration for the Grader.
