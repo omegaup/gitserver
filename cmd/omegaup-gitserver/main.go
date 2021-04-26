@@ -19,7 +19,7 @@ import (
 	"github.com/omegaup/githttp"
 	"github.com/omegaup/gitserver"
 	"github.com/omegaup/gitserver/request"
-	base "github.com/omegaup/go-base"
+	base "github.com/omegaup/go-base/v2"
 )
 
 var (
@@ -120,14 +120,22 @@ func main() {
 
 	if config.Logging.File != "" {
 		var err error
-		if log, err = base.RotatingLog(config.Logging.File, config.Logging.Level); err != nil {
+		log, err = base.RotatingLog(
+			config.Logging.File,
+			config.Logging.Level,
+			config.Logging.JSON,
+		)
+		if err != nil {
 			panic(err)
 		}
 	} else if config.Logging.Level == "debug" {
-		log = base.StderrLog()
+		log = base.StderrLog(config.Logging.JSON)
 	} else {
 		log = log15.New()
-		log.SetHandler(base.ErrorCallerStackHandler(log15.LvlInfo, log15.StderrHandler))
+		log.SetHandler(base.ErrorCallerStackHandler(
+			log15.LvlInfo,
+			base.StderrHandler(config.Logging.JSON),
+		))
 	}
 
 	if config.Gitserver.RootPath == "" {

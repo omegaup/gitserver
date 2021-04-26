@@ -4,7 +4,7 @@ import (
 	"context"
 	"io"
 
-	base "github.com/omegaup/go-base"
+	base "github.com/omegaup/go-base/v2"
 )
 
 type key int

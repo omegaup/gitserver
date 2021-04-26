@@ -229,12 +229,12 @@ github.com/o1egl/paseto v1.0.0/go.mod h1:5HxsZPmw/3RI2pAwGo1HhOOwSdvBpcuVzO7uDkm
 github.com/oklog/oklog v0.3.2/go.mod h1:FCV+B7mhrz4o+ueLpx+KqkyXRGMWOYEvfiXtdGtbWGs=
 github.com/oklog/run v1.0.0/go.mod h1:dlhp/R75TPv97u0XWUtDeV/lRKWPKSdTuV0TZvrmrQA=
 github.com/olekukonko/tablewriter v0.0.0-20170122224234-a0225b3f23b5/go.mod h1:vsDQFd/mU46D+Z4whnwzcISnGGzXWMclvtLoiIKAKIo=
-github.com/omegaup/githttp v1.2.0 h1:zasZzEqtnwbieDgg9AkYs8EuG6sGhk07rERBptwjXP8=
-github.com/omegaup/githttp v1.2.0/go.mod h1:/89tj4YBkX5XRmwWWB4WWE96gtc52/d4zq273eVWll0=
-github.com/omegaup/go-base v1.0.1 h1:7771a0jnJm4CPuK2lJxb56w03ASM1BkYLLfnYwhPagA=
-github.com/omegaup/go-base v1.0.1/go.mod h1:KRWOUExqxHkr/h1GiHEtAKGp4rx6mOGWsBSlN636INY=
-github.com/omegaup/quark v1.3.0 h1:+Y1rHkrxXSVmg2F4l1c2nGriutUCL8F1FcqSSdPn7aQ=
-github.com/omegaup/quark v1.3.0/go.mod h1:ZwBiK+RsbUUO3EVWR90+6WlYU5peSVUHg1sDGK+RiQY=
+github.com/omegaup/githttp v1.3.0 h1:Oz5QuCKZ9Nvo3Q4O7yHolP/IDg85TKYrxoSf5ZuZSLI=
+github.com/omegaup/githttp v1.3.0/go.mod h1:+zgLa30wqP55TVUZTrF6z+zWsFnx+zR3uJ/gs+1hm9k=
+github.com/omegaup/go-base/v2 v2.0.0 h1:A4TGNKDbbAiF55EfxPh5r8knS/zDpFFJpFCYerqByzE=
+github.com/omegaup/go-base/v2 v2.0.0/go.mod h1:k5PYTZcULZt7Dbx67WI0Wk3WHJSMmyadEG1aWx6YbVg=
+github.com/omegaup/quark v1.4.0 h1:0eR/b9zgY9cGlyuGrKZhkGEBVVy3Qk+oCmlJn/ed3Ns=
+github.com/omegaup/quark v1.4.0/go.mod h1:Wfdxag9uBCOveCQvMr63VBSZUyEn7xLBfVrtePKaVrs=
 github.com/onsi/ginkgo v1.6.0/go.mod h1:lLunBs/Ym6LB5Z9jYTR76FiuTmxDTDusOGeTQH+WWjE=
 github.com/onsi/ginkgo v1.7.0/go.mod h1:lLunBs/Ym6LB5Z9jYTR76FiuTmxDTDusOGeTQH+WWjE=
 github.com/onsi/gomega v1.4.3/go.mod h1:ex+gbHU/CVuBBDIJjb2X0qEXbFg53c61hWP/1CpauHY=
@@ -457,8 +457,6 @@ google.golang.org/api v0.3.1/go.mod h1:6wY9I6uQWHQ8EM57III9mq/AjF+i8G65rmVagqKMt
 google.golang.org/appengine v1.1.0/go.mod h1:EbEs0AVv82hx2wNQdGPgUI5lhzA/G0D9YwlJXL52JkM=
 google.golang.org/appengine v1.2.0/go.mod h1:xpcJRLb0r/rnEns0DIKYYv+WjYCduHsrkT7/EB5XEv4=
 google.golang.org/appengine v1.4.0/go.mod h1:xpcJRLb0r/rnEns0DIKYYv+WjYCduHsrkT7/EB5XEv4=
-google.golang.org/appengine v1.6.5 h1:tycE03LOZYQNhDpS27tcQdAzLCVMaj7QT2SXxebnpCM=
-google.golang.org/appengine v1.6.5/go.mod h1:8WjMMxjGQR8xUklV/ARdw2HLXBOI7O7uCIDZVag1xfc=
 google.golang.org/genproto v0.0.0-20180817151627-c66870c02cf8/go.mod h1:JiN7NxoALGmiZfu7CAH4rXhgtRTLTxftemlI0sWmxmc=
 google.golang.org/genproto v0.0.0-20190307195333-5fe7a883aa19/go.mod h1:VzzqZJRnGkLBvHegQrXjBqPurQTc5/KpmUdxsrq26oE=
 google.golang.org/genproto v0.0.0-20190425155659-357c62f0e4bb/go.mod h1:VzzqZJRnGkLBvHegQrXjBqPurQTc5/KpmUdxsrq26oE=

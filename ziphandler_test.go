@@ -20,7 +20,7 @@ import (
 
 	git "github.com/lhchavez/git2go/v32"
 	"github.com/omegaup/gitserver/gitservertest"
-	base "github.com/omegaup/go-base"
+	base "github.com/omegaup/go-base/v2"
 	"github.com/omegaup/quark/common"
 )
 
@@ -121,7 +121,7 @@ func TestPushZip(t *testing.T) {
 		defer os.RemoveAll(tmpDir)
 	}
 
-	log := base.StderrLog()
+	log := base.StderrLog(false)
 	ts := httptest.NewServer(ZipHandler(
 		tmpDir,
 		NewGitProtocol(authorize, nil, true, OverallWallTimeHardLimit, fakeInteractiveSettingsCompiler, log),
@@ -202,7 +202,7 @@ func TestConvertZip(t *testing.T) {
 	}
 	defer repo.Free()
 
-	log := base.StderrLog()
+	log := base.StderrLog(false)
 
 	fileContents := map[string]string{
 		".gitignore":             defaultGitfiles[".gitignore"],
@@ -282,7 +282,7 @@ func TestZiphandlerStatements(t *testing.T) {
 	}
 	defer repo.Free()
 
-	log := base.StderrLog()
+	log := base.StderrLog(false)
 
 	for idx, testcase := range []struct {
 		name          string
@@ -371,7 +371,7 @@ func TestTestplan(t *testing.T) {
 	}
 	defer repo.Free()
 
-	log := base.StderrLog()
+	log := base.StderrLog(false)
 
 	for testplanContents, expectedError := range map[string]string{
 		"0 0.0.0.0":        "invalid-testplan: invalid weight '0.0.0.0': strconv.ParseFloat: parsing \"0.0.0.0\": invalid syntax",
@@ -439,7 +439,7 @@ func TestUpdateProblemSettings(t *testing.T) {
 		defer os.RemoveAll(tmpDir)
 	}
 
-	log := base.StderrLog()
+	log := base.StderrLog(false)
 	ts := httptest.NewServer(ZipHandler(
 		tmpDir,
 		NewGitProtocol(authorize, nil, true, OverallWallTimeHardLimit, fakeInteractiveSettingsCompiler, log),
@@ -574,7 +574,7 @@ func TestUpdateProblemSettingsWithCustomValidator(t *testing.T) {
 		defer os.RemoveAll(tmpDir)
 	}
 
-	log := base.StderrLog()
+	log := base.StderrLog(false)
 	ts := httptest.NewServer(ZipHandler(
 		tmpDir,
 		NewGitProtocol(authorize, nil, true, OverallWallTimeHardLimit, fakeInteractiveSettingsCompiler, log),
@@ -820,7 +820,7 @@ func TestRenameProblem(t *testing.T) {
 		defer os.RemoveAll(tmpDir)
 	}
 
-	log := base.StderrLog()
+	log := base.StderrLog(false)
 	ts := httptest.NewServer(ZipHandler(
 		tmpDir,
 		NewGitProtocol(authorize, nil, true, OverallWallTimeHardLimit, fakeInteractiveSettingsCompiler, log),

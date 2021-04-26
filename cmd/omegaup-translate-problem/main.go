@@ -16,7 +16,7 @@ import (
 	"github.com/omegaup/githttp"
 	"github.com/omegaup/gitserver"
 	"github.com/omegaup/gitserver/request"
-	base "github.com/omegaup/go-base"
+	base "github.com/omegaup/go-base/v2"
 	"github.com/pkg/errors"
 )
 
@@ -602,7 +602,7 @@ func main() {
 	defer git.Shutdown()
 
 	flag.Parse()
-	log := base.StderrLog()
+	log := base.StderrLog(false)
 
 	args := flag.Args()
 	if len(args) != 3 {
