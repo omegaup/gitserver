@@ -14,6 +14,8 @@ jobs:
 
     steps:
       - uses: actions/checkout@v2
+        with:
+          fetch-depth: '0'
 
       - name: Set up Go
         uses: actions/setup-go@v2
@@ -34,7 +36,7 @@ jobs:
 
       - name: Bump version and push tag
         id: bump-version
-        uses: anothrNick/github-tag-action@c170e78287f338a4af0dc49e033e50e5a072d82b
+        uses: anothrNick/github-tag-action@9885a4f9af674ba472de91fb3c0cb033ecb32b7e
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           WITH_V: true
@@ -73,3 +75,28 @@ jobs:
           asset_path: ./omegaup-gitserver.tar.xz
           asset_name: omegaup-gitserver.tar.xz
           asset_content_type: application/octet-stream
+
+      - name: Build the Docker container image
+        env:
+          COMPOSE_DOCKER_CLI_BUILD: 1
+          DOCKER_BUILDKIT: 1
+        run: |
+          docker build --build-arg RELEASE=${{ steps.bump-version.outputs.tag }} .
+
+      - name: Push container to GitHub registry
+        run: |
+          echo "${{ github.token }}" | \
+            docker login https://docker.pkg.github.com "--username=${{ github.actor }}" --password-stdin
+
+          container_name=docker.pkg.github.com/${{ github.repository }}/gitserver:${{ steps.bump-version.outputs.tag }}
+          docker tag omegaup/gitserver "${container_name}"
+          docker push "${container_name}"
+
+      - name: Push container to Docker registry
+        run: |
+          echo "${{ secrets.DOCKER_PASSWORD }}" | \
+            docker login "--username=${{ secrets.DOCKER_USERNAME }}" --password-stdin
+
+          container_name=omegaup/gitserver:${{ steps.bump-version.outputs.tag }}
+          docker tag omegaup/gitserver "${container_name}"
+          docker push "${container_name}"
