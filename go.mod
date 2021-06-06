@@ -1,6 +1,6 @@
 module github.com/omegaup/gitserver
 
-go 1.13
+go 1.16
 
 require (
 	github.com/aead/chacha20poly1305 v0.0.0-20201124145622-1a5aba2a8b29 // indirect
@@ -17,5 +17,6 @@ require (
 	github.com/prometheus/client_golang v1.8.0
 	github.com/saintfish/chardet v0.0.0-20120816061221-3af4cd4741ca
 	golang.org/x/crypto v0.0.0-20201208171446-5f87f3452ae9
+	golang.org/x/lint v0.0.0-20210508222113-6edffad5e616 // indirect
 	golang.org/x/text v0.3.4
 )
