@@ -81,7 +81,7 @@ jobs:
           COMPOSE_DOCKER_CLI_BUILD: 1
           DOCKER_BUILDKIT: 1
         run: |
-          docker build --build-arg RELEASE=${{ steps.bump-version.outputs.tag }} .
+          docker build --build-arg RELEASE=${{ steps.bump-version.outputs.tag }} --tag omegaup/gitserver .
 
       - name: Push container to GitHub registry
         run: |
