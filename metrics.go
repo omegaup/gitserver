@@ -2,8 +2,10 @@ package gitserver
 
 import (
 	"net/http"
+	"runtime"
 
 	base "github.com/omegaup/go-base/v2"
+
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
@@ -38,7 +40,7 @@ func (p *prometheusMetrics) SummaryObserve(name string, value float64) {
 }
 
 // SetupMetrics sets up the metrics for the gitserver.
-func SetupMetrics() (base.Metrics, http.Handler) {
+func SetupMetrics(programVersion string) (base.Metrics, http.Handler) {
 	for _, gauge := range gauges {
 		prometheus.MustRegister(gauge)
 	}
@@ -48,6 +50,17 @@ func SetupMetrics() (base.Metrics, http.Handler) {
 	for _, summary := range summaries {
 		prometheus.MustRegister(summary)
 	}
+
+	buildInfoCounter := prometheus.NewCounter(prometheus.CounterOpts{
+		Help: "Information about the build",
+		Name: "build_info",
+		ConstLabels: prometheus.Labels{
+			"go_version": runtime.Version(),
+			"version":    programVersion,
+		},
+	})
+	prometheus.MustRegister(buildInfoCounter)
+	buildInfoCounter.Inc()
 
 	return &prometheusMetrics{}, promhttp.Handler()
 }

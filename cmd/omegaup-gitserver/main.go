@@ -13,13 +13,14 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/coreos/go-systemd/v22/daemon"
-	"github.com/inconshreveable/log15"
 	git "github.com/lhchavez/git2go/v32"
 	"github.com/omegaup/githttp"
 	"github.com/omegaup/gitserver"
 	"github.com/omegaup/gitserver/request"
 	base "github.com/omegaup/go-base/v2"
+
+	"github.com/coreos/go-systemd/v22/daemon"
+	"github.com/inconshreveable/log15"
 )
 
 var (
@@ -77,7 +78,7 @@ func muxHandler(
 	protocol *githttp.GitProtocol,
 	log log15.Logger,
 ) http.Handler {
-	metrics, metricsHandler := gitserver.SetupMetrics()
+	metrics, metricsHandler := gitserver.SetupMetrics(ProgramVersion)
 	return &muxGitHandler{
 		log:            log,
 		gitHandler:     gitserver.GitHandler(rootPath, protocol, metrics, log),
