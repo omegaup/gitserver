@@ -258,6 +258,74 @@ func TestConvertZip(t *testing.T) {
 	}
 }
 
+func TestZiphandlerSolutions(t *testing.T) {
+	tmpDir, err := ioutil.TempDir("", strings.ReplaceAll(t.Name(), "/", "_"))
+	if err != nil {
+		t.Fatalf("Failed to create directory: %v", err)
+	}
+	if os.Getenv("PRESERVE") == "" {
+		defer os.RemoveAll(tmpDir)
+	}
+
+	problemAlias := "sumas"
+
+	log := base.StderrLog(false)
+
+	ts := httptest.NewServer(ZipHandler(
+		tmpDir,
+		NewGitProtocol(authorize, nil, true, OverallWallTimeHardLimit, fakeInteractiveSettingsCompiler, log),
+		&base.NoOpMetrics{},
+		log,
+	))
+	defer ts.Close()
+	zipContents, err := gitservertest.CreateZip(
+		map[string]io.Reader{
+			".gitignore":                strings.NewReader(defaultGitfiles[".gitignore"]),
+			".gitattributes":            strings.NewReader(defaultGitfiles[".gitattributes"]),
+			"cases/0.in":                strings.NewReader("1 2\n"),
+			"cases/0.out":               strings.NewReader("3\n"),
+			"statements/es.markdown":    strings.NewReader("Sumas\n"),
+			"solutions/es.markdown":     strings.NewReader("Sumas\n"),
+			"solutions/thiswontbeadded": strings.NewReader("Unexpected file\n"),
+		},
+	)
+	if err != nil {
+		t.Fatalf("Failed to create .zip: %v", err)
+	}
+
+	updateResult := postZip(
+		t,
+		adminAuthorization,
+		problemAlias,
+		nil,
+		ZipMergeStrategyTheirs,
+		zipContents,
+		"initial commit",
+		true, // create
+		true, // useMultipartFormData
+		ts,
+	)
+
+	updatedFiles := make(map[string]string)
+	for _, updatedFile := range updateResult.UpdatedFiles {
+		updatedFiles[updatedFile.Path] = updatedFile.Type
+	}
+
+	expectedUpdatedFiles := map[string]string{
+		".gitattributes":         "added",
+		".gitignore":             "added",
+		"cases/0.in":             "added",
+		"cases/0.out":            "added",
+		"settings.distrib.json":  "added",
+		"settings.json":          "added",
+		"statements/es.markdown": "added",
+		"solutions/es.markdown":  "added",
+	}
+	if !reflect.DeepEqual(expectedUpdatedFiles, updatedFiles) {
+		t.Errorf("mismatched updated files, expected %v, got %v", expectedUpdatedFiles, updatedFiles)
+	}
+}
+
 func TestZiphandlerStatements(t *testing.T) {
 	tmpDir, err := ioutil.TempDir("", t.Name())
 	if err != nil {
