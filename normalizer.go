@@ -129,6 +129,7 @@ type LineEndingNormalizer struct {
 	buf             bytes.Buffer
 	outBuf          bytes.Buffer
 	r               io.RuneScanner
+	empty           bool
 	endsWithNewline bool
 	eof             bool
 }
@@ -141,7 +142,8 @@ func NewLineEndingNormalizer(rd io.Reader) *LineEndingNormalizer {
 		br = bufio.NewReader(rd)
 	}
 	return &LineEndingNormalizer{
-		r: br,
+		r:     br,
+		empty: true,
 	}
 }
 
@@ -156,13 +158,14 @@ func (n *LineEndingNormalizer) Read(p []byte) (int, error) {
 		if err != nil {
 			if err == io.EOF {
 				n.eof = true
-				// Unix files always end with a newline character.
-				if !n.endsWithNewline {
+				// Unix non-empty files always end with a newline character.
+				if !n.empty && !n.endsWithNewline {
 					return utf8.EncodeRune(p, '\n'), nil
 				}
 			}
 			return 0, err
 		}
+		n.empty = false
 
 		switch r {
 		case '\r':

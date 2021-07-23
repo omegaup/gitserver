@@ -37,7 +37,7 @@ func TestConvertMarkdownToUTF8(t *testing.T) {
 		// Latin-1 (ISO-8859-1)
 		{[]byte{0x50, 0x6F, 0x6B, 0xE9, 0x6D, 0x6F, 0x6E}, "Pokémon\n"},
 		// Empty
-		{[]byte{}, "\n"},
+		{[]byte{}, ""},
 	}
 
 	for _, c := range cases {
@@ -86,6 +86,10 @@ func TestNormalizeCase(t *testing.T) {
 		{[]byte{0x78, 0x0A, 0x20}, "x\n\n"},
 		// UTF16-LE BOM
 		{[]byte{0xFF, 0xFE, 0x78, 0x00}, "x\n"},
+		// Missing newline
+		{[]byte{0x78}, "x\n"},
+		// Empty file
+		{[]byte{}, ""},
 	}
 
 	for _, c := range cases {
