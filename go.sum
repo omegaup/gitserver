@@ -237,6 +237,8 @@ github.com/omegaup/quark v1.5.4/go.mod h1:tYl8nsttZzuR2Ftxzgz/Hpxd8vkXG3Es8WxWlc
 github.com/omegaup/quark v1.6.0/go.mod h1:5EW7vBSmpqKjXZ1pB0mDkRjqw2BG1TJDoys3ziwe/f8=
 github.com/omegaup/quark v1.6.1 h1:AdzrEFQnYggY4CsAZr9g3JeMlriLJyapqcBFVATDYwE=
 github.com/omegaup/quark v1.6.1/go.mod h1:SYTm75SSGqTyWcbjFUWhUgbRNvg0Qxx45EyvIAKbKnI=
+github.com/omegaup/quark v1.6.2 h1:OyzOiQGrqE5KCGKiLxNfbTMHm3dPUOdnDzAVUAjmw/4=
+github.com/omegaup/quark v1.6.2/go.mod h1:SYTm75SSGqTyWcbjFUWhUgbRNvg0Qxx45EyvIAKbKnI=
 github.com/onsi/ginkgo v1.6.0/go.mod h1:lLunBs/Ym6LB5Z9jYTR76FiuTmxDTDusOGeTQH+WWjE=
 github.com/onsi/ginkgo v1.7.0/go.mod h1:lLunBs/Ym6LB5Z9jYTR76FiuTmxDTDusOGeTQH+WWjE=
 github.com/onsi/gomega v1.4.3/go.mod h1:ex+gbHU/CVuBBDIJjb2X0qEXbFg53c61hWP/1CpauHY=
