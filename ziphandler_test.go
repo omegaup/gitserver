@@ -542,7 +542,7 @@ func TestUpdateProblemSettings(t *testing.T) {
 			},
 			Slow: false,
 			Validator: common.ValidatorSettings{
-				Name: "token-caseless",
+				Name: common.ValidatorNameTokenCaseless,
 			},
 		}
 		updateResult := postZip(
@@ -680,7 +680,7 @@ func TestUpdateProblemSettingsWithCustomValidator(t *testing.T) {
 			},
 			Slow: false,
 			Validator: common.ValidatorSettings{
-				Name: "custom",
+				Name: common.ValidatorNameCustom,
 			},
 		}
 		updateResult := postZip(
@@ -774,7 +774,7 @@ func TestUpdateProblemSettingsWithCustomValidator(t *testing.T) {
 			},
 			Slow: false,
 			Validator: common.ValidatorSettings{
-				Name: "token-caseless",
+				Name: common.ValidatorNameTokenCaseless,
 			},
 		}
 		updateResult := postZip(
@@ -828,7 +828,7 @@ func TestUpdateProblemSettingsWithCustomValidator(t *testing.T) {
 			},
 			Slow: false,
 			Validator: common.ValidatorSettings{
-				Name: "custom",
+				Name: common.ValidatorNameCustom,
 			},
 		}
 		updateResult := postZip(
