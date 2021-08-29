@@ -435,7 +435,7 @@ func CreatePackfile(
 				Limits: common.DefaultLimits,
 				Slow:   false,
 				Validator: common.ValidatorSettings{
-					Name: "token-caseless",
+					Name: common.ValidatorNameTokenCaseless,
 				},
 			}
 		}
@@ -926,6 +926,7 @@ func getUpdatedProblemSettings(
 
 	updatedProblemSettings.Limits = problemSettings.Limits
 	updatedProblemSettings.Validator.Name = problemSettings.Validator.Name
+	updatedProblemSettings.Validator.GroupScorePolicy = problemSettings.Validator.GroupScorePolicy
 	updatedProblemSettings.Validator.Tolerance = problemSettings.Validator.Tolerance
 	updatedProblemSettings.Validator.Limits = problemSettings.Validator.Limits
 

@@ -144,7 +144,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	stopChan := make(chan os.Signal)
+	stopChan := make(chan os.Signal, 1)
 	signal.Notify(stopChan, syscall.SIGINT, syscall.SIGTERM)
 
 	authCallback, err := createAuthorizationCallback(config, log)

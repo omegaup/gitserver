@@ -282,7 +282,7 @@ func isSlow(
 	}
 
 	maxRunDuration := settings.Limits.TimeLimit + settings.Limits.ExtraWallTime
-	if settings.Validator.Limits != nil && settings.Validator.Name == "custom" {
+	if settings.Validator.Limits != nil && settings.Validator.Name == common.ValidatorNameCustom {
 		maxRunDuration += settings.Validator.Limits.TimeLimit + settings.Validator.Limits.ExtraWallTime
 	}
 
@@ -893,7 +893,7 @@ func validateUpdateMaster(
 		}
 		validatorLang = filepath.Ext(entry.Name)[1:]
 	}
-	if problemSettings.Validator.Name == "custom" {
+	if problemSettings.Validator.Name == common.ValidatorNameCustom {
 		if validatorLang == "" {
 			return base.ErrorWithCategory(
 				ErrProblemBadLayout,
@@ -903,7 +903,7 @@ func validateUpdateMaster(
 			)
 		}
 		problemSettings.Validator.Lang = &validatorLang
-		problemSettings.Validator.Name = "custom"
+		problemSettings.Validator.Name = common.ValidatorNameCustom
 	} else if validatorLang != "" {
 		return base.ErrorWithCategory(
 			ErrProblemBadLayout,
@@ -939,15 +939,16 @@ func validateUpdateMaster(
 		Cases:  make(map[string]*common.LiteralCaseSettings),
 		Limits: &problemSettings.Limits,
 		Validator: &common.LiteralValidatorSettings{
-			Name:      problemSettings.Validator.Name,
-			Tolerance: problemSettings.Validator.Tolerance,
+			Name:             problemSettings.Validator.Name,
+			GroupScorePolicy: problemSettings.Validator.GroupScorePolicy,
+			Tolerance:        problemSettings.Validator.Tolerance,
 		},
 	}
 	if problemDistribSettings.Cases, err = extractExampleCases(repository, tree); err != nil {
 		// extractExampleCases already wrapped the error correctly.
 		return err
 	}
-	if problemSettings.Validator.Name == "custom" {
+	if problemSettings.Validator.Name == common.ValidatorNameCustom {
 		problemDistribSettings.Validator.CustomValidator = &common.LiteralCustomValidatorSettings{
 			Source:   "",
 			Language: *problemSettings.Validator.Lang,
