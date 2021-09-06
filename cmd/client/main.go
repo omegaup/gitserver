@@ -12,7 +12,7 @@ import (
 	"time"
 
 	"github.com/inconshreveable/log15"
-	git "github.com/lhchavez/git2go/v32"
+	git "github.com/libgit2/git2go/v32"
 	"github.com/omegaup/githttp"
 	base "github.com/omegaup/go-base/v2"
 	"golang.org/x/crypto/ssh"
