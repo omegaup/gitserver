@@ -19,7 +19,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/inconshreveable/log15"
-	git "github.com/lhchavez/git2go/v32"
+	git "github.com/libgit2/git2go/v32"
 	"github.com/omegaup/githttp"
 	"github.com/omegaup/gitserver/request"
 	base "github.com/omegaup/go-base/v2"

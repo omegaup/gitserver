@@ -13,7 +13,7 @@ import (
 	"syscall"
 	"time"
 
-	git "github.com/lhchavez/git2go/v32"
+	git "github.com/libgit2/git2go/v32"
 	"github.com/omegaup/githttp"
 	"github.com/omegaup/gitserver"
 	"github.com/omegaup/gitserver/request"
