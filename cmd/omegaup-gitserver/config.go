@@ -18,6 +18,12 @@ type LoggingConfig struct {
 	JSON  bool
 }
 
+// NewRelicConfig represents the configuration for NewRelic.
+type NewRelicConfig struct {
+	AppName string
+	License string
+}
+
 // GitserverConfig represents the configuration for the Grader.
 type GitserverConfig struct {
 	// RootPath is the root path of all repositories.
@@ -58,6 +64,7 @@ type GitserverConfig struct {
 type Config struct {
 	Db        DbConfig
 	Logging   LoggingConfig
+	NewRelic  NewRelicConfig
 	Gitserver GitserverConfig
 }
 
@@ -69,6 +76,9 @@ var defaultConfig = Config{
 	Logging: LoggingConfig{
 		File:  "/var/log/omegaup/gitserver.log",
 		Level: "info",
+	},
+	NewRelic: NewRelicConfig{
+		AppName: "gitserver.omegaup.com",
 	},
 	Gitserver: GitserverConfig{
 		RootPath:                               "/var/lib/omegaup/problems.git",

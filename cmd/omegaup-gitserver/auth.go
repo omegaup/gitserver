@@ -14,12 +14,14 @@ import (
 	"strings"
 	"time"
 
+	"github.com/omegaup/githttp"
+	"github.com/omegaup/gitserver/request"
+
 	_ "github.com/go-sql-driver/mysql"
 	"github.com/inconshreveable/log15"
 	_ "github.com/mattn/go-sqlite3"
+	"github.com/newrelic/go-agent/v3/newrelic"
 	"github.com/o1egl/paseto"
-	"github.com/omegaup/githttp"
-	"github.com/omegaup/gitserver/request"
 	"github.com/pkg/errors"
 	"golang.org/x/crypto/argon2"
 	"golang.org/x/crypto/ed25519"
@@ -275,6 +277,10 @@ func (a *omegaupAuthorization) authorize(
 	if !ok {
 		username, problem, ok = a.parseAuthorizationHeader(r.Header.Get("Authorization"), repositoryName)
 	}
+
+	txn := newrelic.FromContext(r.Context())
+	txn.AddAttribute("problem", problem)
+	txn.AddAttribute("username", username)
 
 	if basicAuthUsername != "" && basicAuthUsername != username {
 		// If Basic authentication was attempted, verify that the token actually corresponds to the user.

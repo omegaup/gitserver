@@ -1728,15 +1728,6 @@ func (p *gitProtocol) preprocess(
 	return originalPackPath, originalCommands, nil
 }
 
-type gitHandler struct {
-	handler http.Handler
-	log     log15.Logger
-}
-
-func (g *gitHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	g.handler.ServeHTTP(w, r)
-}
-
 // GitHandler is the HTTP handler for the omegaUp git server.
 func GitHandler(
 	rootPath string,
@@ -1744,19 +1735,16 @@ func GitHandler(
 	metrics base.Metrics,
 	log log15.Logger,
 ) http.Handler {
-	return &gitHandler{
-		handler: githttp.GitServer(
-			rootPath,
-			"",
-			true,
-			protocol,
-			func(ctx context.Context) context.Context {
-				return request.NewContext(ctx, metrics)
-			},
-			log,
-		),
-		log: log,
-	}
+	return githttp.GitServer(
+		rootPath,
+		"",
+		true,
+		protocol,
+		func(ctx context.Context) context.Context {
+			return request.NewContext(ctx, metrics)
+		},
+		log,
+	)
 }
 
 // InitRepository is a wrapper around git.CreateRepository() that also adds

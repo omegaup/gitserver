@@ -21,6 +21,7 @@ import (
 
 	"github.com/coreos/go-systemd/v22/daemon"
 	"github.com/inconshreveable/log15"
+	"github.com/newrelic/go-agent/v3/newrelic"
 )
 
 var (
@@ -74,15 +75,18 @@ type muxGitHandler struct {
 }
 
 func muxHandler(
+	app *newrelic.Application,
 	rootPath string,
 	protocol *githttp.GitProtocol,
 	log log15.Logger,
 ) http.Handler {
 	metrics, metricsHandler := gitserver.SetupMetrics(ProgramVersion)
+	_, wrappedGitHandler := newrelic.WrapHandle(app, "/", gitserver.GitHandler(rootPath, protocol, metrics, log))
+	_, wrappedZipHandler := newrelic.WrapHandle(app, "/", gitserver.ZipHandler(rootPath, protocol, metrics, log))
 	return &muxGitHandler{
 		log:            log,
-		gitHandler:     gitserver.GitHandler(rootPath, protocol, metrics, log),
-		zipHandler:     gitserver.ZipHandler(rootPath, protocol, metrics, log),
+		gitHandler:     wrappedGitHandler,
+		zipHandler:     wrappedZipHandler,
 		metricsHandler: metricsHandler,
 	}
 }
@@ -93,10 +97,36 @@ func (h *muxGitHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		h.metricsHandler.ServeHTTP(w, r)
 	} else if len(splitPath) == 2 && splitPath[1] == "git-upload-zip" ||
 		len(splitPath) == 3 && splitPath[1] == "rename-repository" {
+		txn := newrelic.FromContext(r.Context())
+		txn.SetName(r.Method + " " + splitPath[1])
 		h.zipHandler.ServeHTTP(w, r)
 	} else {
 		h.gitHandler.ServeHTTP(w, r)
 	}
+}
+
+type log15Logger struct {
+	log log15.Logger
+}
+
+func (l *log15Logger) Error(msg string, context map[string]interface{}) {
+	l.log.Error(msg, log15.Ctx(context))
+}
+
+func (l *log15Logger) Warn(msg string, context map[string]interface{}) {
+	l.log.Warn(msg, log15.Ctx(context))
+}
+
+func (l *log15Logger) Info(msg string, context map[string]interface{}) {
+	l.log.Info(msg, log15.Ctx(context))
+}
+
+func (l *log15Logger) Debug(msg string, context map[string]interface{}) {
+	l.log.Debug(msg, log15.Ctx(context))
+}
+
+func (l *log15Logger) DebugEnabled() bool {
+	return true
 }
 
 func main() {
@@ -139,6 +169,18 @@ func main() {
 		))
 	}
 
+	var app *newrelic.Application
+	if config.NewRelic.License != "" {
+		app, err = newrelic.NewApplication(
+			newrelic.ConfigAppName(config.NewRelic.AppName),
+			newrelic.ConfigLicense(config.NewRelic.License),
+			newrelic.ConfigLogger(&log15Logger{log: log}),
+		)
+		if err != nil {
+			panic(err)
+		}
+	}
+
 	if config.Gitserver.RootPath == "" {
 		log.Error("root path cannot be empty. Please specify one with -root")
 		os.Exit(1)
@@ -169,7 +211,7 @@ func main() {
 	var wg sync.WaitGroup
 	gitServer := &http.Server{
 		Addr:    fmt.Sprintf(":%d", config.Gitserver.Port),
-		Handler: muxHandler(config.Gitserver.RootPath, protocol, log),
+		Handler: muxHandler(app, config.Gitserver.RootPath, protocol, log),
 	}
 	servers = append(servers, gitServer)
 	wg.Add(1)

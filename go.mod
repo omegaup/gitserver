@@ -12,6 +12,7 @@ require (
 	github.com/mattn/go-colorable v0.1.8 // indirect
 	github.com/mattn/go-isatty v0.0.12 // indirect
 	github.com/mattn/go-sqlite3 v1.14.8
+	github.com/newrelic/go-agent/v3 v3.15.1
 	github.com/o1egl/paseto v1.0.0
 	github.com/omegaup/githttp v1.5.0
 	github.com/omegaup/go-base/v2 v2.1.0
@@ -20,7 +21,22 @@ require (
 	github.com/prometheus/client_golang v1.8.0
 	github.com/saintfish/chardet v0.0.0-20120816061221-3af4cd4741ca
 	golang.org/x/crypto v0.0.0-20201208171446-5f87f3452ae9
-	golang.org/x/lint v0.0.0-20210508222113-6edffad5e616 // indirect
 	golang.org/x/sys v0.0.0-20201214095126-aec9a390925b // indirect
 	golang.org/x/text v0.3.4
+)
+
+require (
+	github.com/aead/chacha20 v0.0.0-20180709150244-8b13a72661da // indirect
+	github.com/aead/poly1305 v0.0.0-20180717145839-3fee0db0b635 // indirect
+	github.com/beorn7/perks v1.0.1 // indirect
+	github.com/cespare/xxhash/v2 v2.1.1 // indirect
+	github.com/golang/protobuf v1.4.3 // indirect
+	github.com/matttproud/golang_protobuf_extensions v1.0.1 // indirect
+	github.com/prometheus/client_model v0.2.0 // indirect
+	github.com/prometheus/common v0.15.0 // indirect
+	github.com/prometheus/procfs v0.2.0 // indirect
+	golang.org/x/net v0.0.0-20201209123823-ac852fbbde11 // indirect
+	google.golang.org/genproto v0.0.0-20200526211855-cb27e3aa2013 // indirect
+	google.golang.org/grpc v1.27.0 // indirect
+	google.golang.org/protobuf v1.25.0 // indirect
 )
