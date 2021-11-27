@@ -175,6 +175,7 @@ func main() {
 			newrelic.ConfigAppName(config.NewRelic.AppName),
 			newrelic.ConfigLicense(config.NewRelic.License),
 			newrelic.ConfigLogger(&log15Logger{log: log}),
+			newrelic.ConfigDistributedTracerEnabled(true),
 		)
 		if err != nil {
 			panic(err)
