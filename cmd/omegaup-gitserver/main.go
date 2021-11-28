@@ -98,7 +98,7 @@ func (h *muxGitHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	} else if len(splitPath) == 2 && splitPath[1] == "git-upload-zip" ||
 		len(splitPath) == 3 && splitPath[1] == "rename-repository" {
 		txn := newrelic.FromContext(r.Context())
-		txn.SetName(r.Method + " " + splitPath[1])
+		txn.SetName(r.Method + " /" + splitPath[1])
 		h.zipHandler.ServeHTTP(w, r)
 	} else {
 		h.gitHandler.ServeHTTP(w, r)
