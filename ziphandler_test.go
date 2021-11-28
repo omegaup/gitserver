@@ -32,7 +32,6 @@ func wrapReaders(contents map[string]string) map[string]io.Reader {
 }
 
 func postZip(
-	t *testing.T,
 	authorization string,
 	problemAlias string,
 	problemSettings *common.ProblemSettings,
@@ -42,20 +41,19 @@ func postZip(
 	create bool,
 	useMultipartFormData bool,
 	ts *httptest.Server,
-) *UpdateResult {
-	t.Helper()
+) (*UpdateResult, error) {
 	problemSettingsString := ""
 	if problemSettings != nil {
 		problemSettingsBytes, err := json.Marshal(problemSettings)
 		if err != nil {
-			t.Fatalf("failed to marshal the problem settings: %v", err)
+			return nil, fmt.Errorf("failed to marshal the problem settings: %w", err)
 		}
 		problemSettingsString = string(problemSettingsBytes)
 	}
 
 	pushURL, err := url.Parse(ts.URL + "/" + problemAlias + "/git-upload-zip")
 	if err != nil {
-		t.Fatalf("Failed to parse URL: %v", err)
+		return nil, fmt.Errorf("Failed to parse URL: %w", err)
 	}
 	var buf bytes.Buffer
 	req := &http.Request{
@@ -97,18 +95,49 @@ func postZip(
 	req.URL.RawQuery = query.Encode()
 	res, err := ts.Client().Do(req)
 	if err != nil {
-		t.Fatalf("Failed to upload zip: %v", err)
+		return nil, fmt.Errorf("Failed to upload zip: %w", err)
 	}
 	defer res.Body.Close()
-	if res.StatusCode != http.StatusOK {
-		t.Fatalf("Failed to upload zip: Status %v, headers: %v", res.StatusCode, res.Header)
-	}
 
 	var updateResult UpdateResult
-	if err := json.NewDecoder(res.Body).Decode(&updateResult); err != nil {
-		t.Fatalf("Failed to unmarshal updateResult: %v", err)
+	if err := json.NewDecoder(res.Body).Decode(&updateResult); err != nil && res.StatusCode == http.StatusOK {
+		return nil, fmt.Errorf("Failed to unmarshal updateResult: %w", err)
 	}
-	return &updateResult
+
+	if res.StatusCode != http.StatusOK {
+		return &updateResult, fmt.Errorf("Failed to upload zip: Status %v, headers: %v", res.StatusCode, res.Header)
+	}
+
+	return &updateResult, nil
+}
+
+func mustPostZip(
+	t *testing.T,
+	authorization string,
+	problemAlias string,
+	problemSettings *common.ProblemSettings,
+	zipMergeStrategy ZipMergeStrategy,
+	zipContents []byte,
+	commitMessage string,
+	create bool,
+	useMultipartFormData bool,
+	ts *httptest.Server,
+) *UpdateResult {
+	result, err := postZip(
+		authorization,
+		problemAlias,
+		problemSettings,
+		zipMergeStrategy,
+		zipContents,
+		commitMessage,
+		create,
+		useMultipartFormData,
+		ts,
+	)
+	if err != nil {
+		t.Fatalf("%v, result=%v", err, result)
+	}
+	return result
 }
 
 func TestPushZip(t *testing.T) {
@@ -143,7 +172,7 @@ func TestPushZip(t *testing.T) {
 		if err != nil {
 			t.Fatalf("Failed to create zip: %v", err)
 		}
-		postZip(
+		mustPostZip(
 			t,
 			adminAuthorization,
 			problemAlias,
@@ -169,7 +198,7 @@ func TestPushZip(t *testing.T) {
 		if err != nil {
 			t.Fatalf("Failed to create zip: %v", err)
 		}
-		postZip(
+		mustPostZip(
 			t,
 			adminAuthorization,
 			problemAlias,
@@ -258,6 +287,86 @@ func TestConvertZip(t *testing.T) {
 	}
 }
 
+func TestZiphandlerCases(t *testing.T) {
+	tmpDir, err := ioutil.TempDir("", strings.ReplaceAll(t.Name(), "/", "_"))
+	if err != nil {
+		t.Fatalf("Failed to create directory: %v", err)
+	}
+	if os.Getenv("PRESERVE") == "" {
+		defer os.RemoveAll(tmpDir)
+	}
+
+	problemAlias := "sumas"
+
+	log := base.StderrLog(false)
+
+	ts := httptest.NewServer(ZipHandler(
+		tmpDir,
+		NewGitProtocol(authorize, nil, true, OverallWallTimeHardLimit, fakeInteractiveSettingsCompiler, log),
+		&base.NoOpMetrics{},
+		log,
+	))
+	defer ts.Close()
+
+	for name, tc := range map[string]struct {
+		contents      map[string]io.Reader
+		expectedError string
+	}{
+		"missing cases": {
+			contents: map[string]io.Reader{
+				".gitignore":             strings.NewReader(defaultGitfiles[".gitignore"]),
+				".gitattributes":         strings.NewReader(defaultGitfiles[".gitattributes"]),
+				"statements/es.markdown": strings.NewReader("Sumas\n"),
+			},
+			expectedError: "problem-bad-layout: cases/ directory missing or empty",
+		},
+		"cases with extension": {
+			contents: map[string]io.Reader{
+				".gitignore":             strings.NewReader(defaultGitfiles[".gitignore"]),
+				".gitattributes":         strings.NewReader(defaultGitfiles[".gitattributes"]),
+				"cases/case.in.txt":      strings.NewReader("1 2"),
+				"cases/case.out.txt":     strings.NewReader("3"),
+				"statements/es.markdown": strings.NewReader("Sumas\n"),
+			},
+			expectedError: "problem-bad-layout: cases/ directory missing or empty",
+		},
+		"cases with missing .out": {
+			contents: map[string]io.Reader{
+				".gitignore":             strings.NewReader(defaultGitfiles[".gitignore"]),
+				".gitattributes":         strings.NewReader(defaultGitfiles[".gitattributes"]),
+				"cases/case.in":          strings.NewReader("1 2"),
+				"statements/es.markdown": strings.NewReader("Sumas\n"),
+			},
+			expectedError: "mismatched-input-file: failed to find the output file for cases/case",
+		},
+	} {
+		tc := tc
+		t.Run(name, func(t *testing.T) {
+			zipContents, err := gitservertest.CreateZip(tc.contents)
+			if err != nil {
+				t.Fatalf("Failed to create .zip: %v", err)
+			}
+			result, err := postZip(
+				adminAuthorization,
+				problemAlias,
+				nil,
+				ZipMergeStrategyTheirs,
+				zipContents,
+				"initial commit",
+				true, // create
+				true, // useMultipartFormData
+				ts,
+			)
+			if result == nil {
+				t.Fatalf("Failed to upload .zip: %v", err)
+			}
+			if tc.expectedError != result.Error {
+				t.Fatalf("Unexpected error. Expected %q, got %q", tc.expectedError, result.Error)
+			}
+		})
+	}
+}
+
 func TestZiphandlerSolutions(t *testing.T) {
 	tmpDir, err := ioutil.TempDir("", strings.ReplaceAll(t.Name(), "/", "_"))
 	if err != nil {
@@ -293,7 +402,7 @@ func TestZiphandlerSolutions(t *testing.T) {
 		t.Fatalf("Failed to create .zip: %v", err)
 	}
 
-	updateResult := postZip(
+	updateResult := mustPostZip(
 		t,
 		adminAuthorization,
 		problemAlias,
@@ -511,7 +620,7 @@ func TestUpdateProblemSettings(t *testing.T) {
 		if err != nil {
 			t.Fatalf("Failed to create zip: %v", err)
 		}
-		postZip(
+		mustPostZip(
 			t,
 			adminAuthorization,
 			problemAlias,
@@ -545,7 +654,7 @@ func TestUpdateProblemSettings(t *testing.T) {
 				Name: common.ValidatorNameTokenCaseless,
 			},
 		}
-		updateResult := postZip(
+		updateResult := mustPostZip(
 			t,
 			adminAuthorization,
 			problemAlias,
@@ -584,7 +693,7 @@ func TestUpdateProblemSettings(t *testing.T) {
 		if err != nil {
 			t.Fatalf("Failed to create zip: %v", err)
 		}
-		updateResult := postZip(
+		updateResult := mustPostZip(
 			t,
 			adminAuthorization,
 			problemAlias,
@@ -648,7 +757,7 @@ func TestUpdateProblemSettingsWithCustomValidator(t *testing.T) {
 		if err != nil {
 			t.Fatalf("Failed to create zip: %v", err)
 		}
-		postZip(
+		mustPostZip(
 			t,
 			adminAuthorization,
 			problemAlias,
@@ -683,7 +792,7 @@ func TestUpdateProblemSettingsWithCustomValidator(t *testing.T) {
 				Name: common.ValidatorNameCustom,
 			},
 		}
-		updateResult := postZip(
+		updateResult := mustPostZip(
 			t,
 			adminAuthorization,
 			problemAlias,
@@ -723,7 +832,7 @@ func TestUpdateProblemSettingsWithCustomValidator(t *testing.T) {
 		if err != nil {
 			t.Fatalf("Failed to create zip: %v", err)
 		}
-		updateResult := postZip(
+		updateResult := mustPostZip(
 			t,
 			adminAuthorization,
 			problemAlias,
@@ -777,7 +886,7 @@ func TestUpdateProblemSettingsWithCustomValidator(t *testing.T) {
 				Name: common.ValidatorNameTokenCaseless,
 			},
 		}
-		updateResult := postZip(
+		updateResult := mustPostZip(
 			t,
 			adminAuthorization,
 			problemAlias,
@@ -831,7 +940,7 @@ func TestUpdateProblemSettingsWithCustomValidator(t *testing.T) {
 				Name: common.ValidatorNameCustom,
 			},
 		}
-		updateResult := postZip(
+		updateResult := mustPostZip(
 			t,
 			adminAuthorization,
 			problemAlias,
@@ -894,7 +1003,7 @@ func TestRenameProblem(t *testing.T) {
 		if err != nil {
 			t.Fatalf("Failed to create zip: %v", err)
 		}
-		postZip(
+		mustPostZip(
 			t,
 			adminAuthorization,
 			problemAlias,
