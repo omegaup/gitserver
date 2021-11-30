@@ -40,6 +40,7 @@ func postZip(
 	commitMessage string,
 	create bool,
 	useMultipartFormData bool,
+	acceptsSubmissions bool,
 	ts *httptest.Server,
 ) (*UpdateResult, error) {
 	problemSettingsString := ""
@@ -51,7 +52,7 @@ func postZip(
 		problemSettingsString = string(problemSettingsBytes)
 	}
 
-	pushURL, err := url.Parse(ts.URL + "/" + problemAlias + "/git-upload-zip")
+	pushURL, err := url.Parse(fmt.Sprintf("%s/%s/git-upload-zip?acceptsSubmissions=%v", ts.URL, problemAlias, acceptsSubmissions))
 	if err != nil {
 		return nil, fmt.Errorf("Failed to parse URL: %w", err)
 	}
@@ -121,6 +122,7 @@ func mustPostZip(
 	commitMessage string,
 	create bool,
 	useMultipartFormData bool,
+	acceptsSubmissions bool,
 	ts *httptest.Server,
 ) *UpdateResult {
 	result, err := postZip(
@@ -132,6 +134,7 @@ func mustPostZip(
 		commitMessage,
 		create,
 		useMultipartFormData,
+		acceptsSubmissions,
 		ts,
 	)
 	if err != nil {
@@ -182,6 +185,7 @@ func TestPushZip(t *testing.T) {
 			"initial commit",
 			true, // create
 			true, // useMultipartFormData
+			true, // acceptsSubmissions
 			ts,
 		)
 	}
@@ -208,6 +212,7 @@ func TestPushZip(t *testing.T) {
 			"initial commit",
 			false, // create
 			false, // useMultipartFormData
+			true,  // acceptsSubmissions
 			ts,
 		)
 	}
@@ -355,6 +360,7 @@ func TestZiphandlerCases(t *testing.T) {
 				"initial commit",
 				true, // create
 				true, // useMultipartFormData
+				true, // acceptsSubmissions
 				ts,
 			)
 			if result == nil {
@@ -412,6 +418,7 @@ func TestZiphandlerSolutions(t *testing.T) {
 		"initial commit",
 		true, // create
 		true, // useMultipartFormData
+		true, // acceptsSubmissions
 		ts,
 	)
 
@@ -630,6 +637,7 @@ func TestUpdateProblemSettings(t *testing.T) {
 			"initial commit",
 			true, // create
 			true, // useMultipartFormData
+			true, // acceptsSubmissions
 			ts,
 		)
 	}
@@ -664,6 +672,7 @@ func TestUpdateProblemSettings(t *testing.T) {
 			"updated settings",
 			false, // create
 			false, // useMultipartFormData
+			true,  // acceptsSubmissions
 			ts,
 		)
 
@@ -703,6 +712,7 @@ func TestUpdateProblemSettings(t *testing.T) {
 			"updated statement",
 			false, // create
 			false, // useMultipartFormData
+			true,  // acceptsSubmissions
 			ts,
 		)
 
@@ -767,6 +777,7 @@ func TestUpdateProblemSettingsWithCustomValidator(t *testing.T) {
 			"initial commit",
 			true, // create
 			true, // useMultipartFormData
+			true, // acceptsSubmissions
 			ts,
 		)
 	}
@@ -802,6 +813,7 @@ func TestUpdateProblemSettingsWithCustomValidator(t *testing.T) {
 			"updated settings",
 			false, // create
 			false, // useMultipartFormData
+			true,  // acceptsSubmissions
 			ts,
 		)
 
@@ -842,6 +854,7 @@ func TestUpdateProblemSettingsWithCustomValidator(t *testing.T) {
 			"updated statement",
 			false, // create
 			false, // useMultipartFormData
+			true,  // acceptsSubmissions
 			ts,
 		)
 
@@ -896,6 +909,7 @@ func TestUpdateProblemSettingsWithCustomValidator(t *testing.T) {
 			"updated validator",
 			false, // create
 			false, // useMultipartFormData
+			true,  // acceptsSubmissions
 			ts,
 		)
 
@@ -950,6 +964,7 @@ func TestUpdateProblemSettingsWithCustomValidator(t *testing.T) {
 			"updated validator",
 			false, // create
 			false, // useMultipartFormData
+			true,  // acceptsSubmissions
 			ts,
 		)
 
@@ -1013,6 +1028,7 @@ func TestRenameProblem(t *testing.T) {
 			"initial commit",
 			true, // create
 			true, // useMultipartFormData
+			true, // acceptsSubmissions
 			ts,
 		)
 		if _, err := os.Stat(path.Join(tmpDir, problemAlias)); err != nil {

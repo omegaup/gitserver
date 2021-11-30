@@ -1053,6 +1053,12 @@ func ConvertZipToPackfile(
 		return nil, ErrNoEsStatement
 	}
 	if acceptsSubmissions {
+		if len(inCases) == 0 && len(outCases) == 0 {
+			return nil, base.ErrorWithCategory(
+				ErrProblemBadLayout,
+				errors.New("cases/ directory missing or empty"),
+			)
+		}
 		for inName := range inCases {
 			if _, ok := outCases[inName]; !ok {
 				return nil, base.ErrorWithCategory(

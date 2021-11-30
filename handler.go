@@ -605,14 +605,6 @@ func validateUpdateMaster(
 		return err
 	}
 
-	// Cases.
-	if len(problemSettings.Cases) == 0 {
-		return base.ErrorWithCategory(
-			ErrProblemBadLayout,
-			errors.New("cases/ directory missing or empty"),
-		)
-	}
-
 	// Tests.
 	testsTreeEntry := tree.EntryByName("tests")
 	if testsTreeEntry != nil {
