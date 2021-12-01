@@ -180,6 +180,7 @@ func (a *omegaupAuthorization) parseUsernameAndPassword(
 func (a *omegaupAuthorization) parseAuthorizationHeader(
 	authorizationHeader string,
 	repositoryName string,
+	isLocalRequest bool,
 ) (username, problem string, ok bool) {
 	tokens := strings.SplitN(authorizationHeader, " ", 3)
 
@@ -207,6 +208,12 @@ func (a *omegaupAuthorization) parseAuthorizationHeader(
 			problem = repositoryName
 			ok = true
 		}
+	}
+
+	if isLocalRequest && len(tokens) == 1 && tokens[0] == "omegaup:health" {
+		username = tokens[0]
+		problem = repositoryName
+		ok = true
 	}
 
 	return
@@ -269,13 +276,14 @@ func (a *omegaupAuthorization) authorize(
 	repositoryName string,
 	operation githttp.GitOperation,
 ) (githttp.AuthorizationLevel, string) {
+	isLocalRequest := strings.HasPrefix(r.RemoteAddr, "127.0.0.1:")
 	basicAuthUsername, password, ok := r.BasicAuth()
 	var username, problem string
 	if ok {
 		username, problem, ok = a.parseUsernameAndPassword(basicAuthUsername, password, repositoryName)
 	}
 	if !ok {
-		username, problem, ok = a.parseAuthorizationHeader(r.Header.Get("Authorization"), repositoryName)
+		username, problem, ok = a.parseAuthorizationHeader(r.Header.Get("Authorization"), repositoryName, isLocalRequest)
 	}
 
 	txn := newrelic.FromContext(r.Context())
@@ -285,7 +293,7 @@ func (a *omegaupAuthorization) authorize(
 	if basicAuthUsername != "" && basicAuthUsername != username {
 		// If Basic authentication was attempted, verify that the token actually corresponds to the user.
 		ok = false
-		log.Error(
+		a.log.Error(
 			"Mismatched Basic authentication username",
 			"username", username,
 			"basic auth username", basicAuthUsername,
@@ -311,7 +319,7 @@ func (a *omegaupAuthorization) authorize(
 		}
 		w.Header().Set("WWW-Authenticate", strings.Join(authenticationSchemes, ", "))
 		w.WriteHeader(http.StatusUnauthorized)
-		log.Error(
+		a.log.Error(
 			"Missing authentication",
 			"username", username,
 			"repository", repositoryName,
@@ -321,7 +329,7 @@ func (a *omegaupAuthorization) authorize(
 
 	if problem != repositoryName {
 		w.WriteHeader(http.StatusForbidden)
-		log.Error(
+		a.log.Error(
 			"Mismatched problem name",
 			"username", username,
 			"repository", repositoryName,
@@ -333,7 +341,10 @@ func (a *omegaupAuthorization) authorize(
 	requestContext := request.FromContext(ctx)
 	requestContext.Request.ProblemName = problem
 	requestContext.Request.Username = username
-	if username == "omegaup:system" || *insecureSkipAuthorization {
+	if username == "omegaup:health" && isLocalRequest {
+		// This is a legit health check, so we grant reading privileges.
+		requestContext.Request.CanView = true
+	} else if username == "omegaup:system" || *insecureSkipAuthorization {
 		// This is the frontend, and we trust it completely.
 		requestContext.Request.IsSystem = true
 		requestContext.Request.IsAdmin = true
@@ -351,7 +362,7 @@ func (a *omegaupAuthorization) authorize(
 			problem,
 		)
 		if err != nil {
-			log.Error(
+			a.log.Error(
 				"Auth",
 				"username", username,
 				"repository", repositoryName,
@@ -365,7 +376,7 @@ func (a *omegaupAuthorization) authorize(
 		requestContext.Request.CanView = auth.CanView
 		requestContext.Request.CanEdit = auth.CanEdit
 	}
-	log.Info(
+	a.log.Info(
 		"Auth",
 		"username", username,
 		"repository", repositoryName,
