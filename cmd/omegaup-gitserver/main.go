@@ -72,10 +72,12 @@ type muxGitHandler struct {
 	gitHandler     http.Handler
 	zipHandler     http.Handler
 	metricsHandler http.Handler
+	healthHandler  http.Handler
 }
 
 func muxHandler(
 	app *newrelic.Application,
+	port uint16,
 	rootPath string,
 	protocol *githttp.GitProtocol,
 	log log15.Logger,
@@ -83,22 +85,27 @@ func muxHandler(
 	metrics, metricsHandler := gitserver.SetupMetrics(ProgramVersion)
 	_, wrappedGitHandler := newrelic.WrapHandle(app, "/", gitserver.GitHandler(rootPath, protocol, metrics, log))
 	_, wrappedZipHandler := newrelic.WrapHandle(app, "/", gitserver.ZipHandler(rootPath, protocol, metrics, log))
+	_, wrappedHealthHandler := newrelic.WrapHandle(app, "/health", gitserver.HealthHandler(port))
+	_, wrappedMetricsHandler := newrelic.WrapHandle(app, "/metrics", metricsHandler)
 	return &muxGitHandler{
 		log:            log,
 		gitHandler:     wrappedGitHandler,
 		zipHandler:     wrappedZipHandler,
-		metricsHandler: metricsHandler,
+		metricsHandler: wrappedMetricsHandler,
+		healthHandler:  wrappedHealthHandler,
 	}
 }
 
 func (h *muxGitHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	splitPath := strings.Split(r.URL.Path[1:], "/")
-	if len(splitPath) >= 1 && splitPath[0] == "metrics" {
+	if len(splitPath) == 2 && splitPath[0] == "health" {
+		h.healthHandler.ServeHTTP(w, r)
+	} else if len(splitPath) >= 1 && splitPath[0] == "metrics" {
 		h.metricsHandler.ServeHTTP(w, r)
 	} else if len(splitPath) == 2 && splitPath[1] == "git-upload-zip" ||
 		len(splitPath) == 3 && splitPath[1] == "rename-repository" {
 		txn := newrelic.FromContext(r.Context())
-		txn.SetName(r.Method + " /" + splitPath[1])
+		txn.SetName(r.Method + " /:repo/" + splitPath[1])
 		h.zipHandler.ServeHTTP(w, r)
 	} else {
 		h.gitHandler.ServeHTTP(w, r)
@@ -211,8 +218,14 @@ func main() {
 	var servers []*http.Server
 	var wg sync.WaitGroup
 	gitServer := &http.Server{
-		Addr:    fmt.Sprintf(":%d", config.Gitserver.Port),
-		Handler: muxHandler(app, config.Gitserver.RootPath, protocol, log),
+		Addr: fmt.Sprintf(":%d", config.Gitserver.Port),
+		Handler: muxHandler(
+			app,
+			config.Gitserver.Port,
+			config.Gitserver.RootPath,
+			protocol,
+			log,
+		),
 	}
 	servers = append(servers, gitServer)
 	wg.Add(1)
