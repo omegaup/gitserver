@@ -330,7 +330,7 @@ func commitBlobs(
 		return nil, err
 	}
 
-	updatedFiles, err := gitserver.GetUpdatedFiles(repo, updatedRefs)
+	updatedFiles, err := gitserver.GetUpdatedFiles(ctx, repo, updatedRefs)
 	if err != nil {
 		log.Error("failed to get updated files", "err", err)
 	}
@@ -358,6 +358,7 @@ func main() {
 		os.Exit(1)
 	}
 
+	ctx := context.Background()
 	var repo *git.Repository
 	commitCallback := func() error { return nil }
 	if _, err := os.Stat(*repositoryPath); os.IsNotExist(err) {
@@ -373,7 +374,7 @@ func main() {
 			os.Exit(1)
 		}
 
-		repo, err = gitserver.InitRepository(dir)
+		repo, err = gitserver.InitRepository(ctx, dir)
 		if err != nil {
 			log.Crit("Failed to init bare repository", "err", err)
 			os.Exit(1)

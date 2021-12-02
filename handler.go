@@ -238,7 +238,12 @@ func NewGitProtocol(opts GitProtocolOpts) *githttp.GitProtocol {
 	return githttp.NewGitProtocol(opts.GitProtocolOpts)
 }
 
-func getProblemSettings(repo *git.Repository, tree *git.Tree) (*common.ProblemSettings, error) {
+func getProblemSettings(
+	ctx context.Context,
+	repo *git.Repository,
+	tree *git.Tree,
+) (*common.ProblemSettings, error) {
+	defer tracing.FromContext(ctx).StartSegment("getProblemSettings").End()
 	settingsJSONEntry, err := tree.EntryByPath("settings.json")
 	if err != nil {
 		return nil, base.ErrorWithCategory(
@@ -355,9 +360,11 @@ func extractExampleCasesFromStatement(
 }
 
 func extractExampleCases(
-	repository *git.Repository,
+	ctx context.Context,
+	repo *git.Repository,
 	tree *git.Tree,
 ) (map[string]*common.LiteralCaseSettings, error) {
+	defer tracing.FromContext(ctx).StartSegment("preprocessMaster").End()
 	exampleCases := make(map[string]*common.LiteralCaseSettings)
 
 	for _, examplesDirectory := range []string{"examples", "interactive/examples"} {
@@ -376,7 +383,7 @@ func extractExampleCases(
 			)
 		}
 
-		examplesTree, err := repository.LookupTree(entry.Id)
+		examplesTree, err := repo.LookupTree(entry.Id)
 		if err != nil {
 			return nil, base.ErrorWithCategory(
 				ErrInternalGit,
@@ -409,7 +416,7 @@ func extractExampleCases(
 				)
 			}
 
-			inputBlob, err := repository.LookupBlob(inputEntry.Id)
+			inputBlob, err := repo.LookupBlob(inputEntry.Id)
 			if err != nil {
 				return nil, base.ErrorWithCategory(
 					ErrInternalGit,
@@ -423,7 +430,7 @@ func extractExampleCases(
 			}
 			defer inputBlob.Free()
 
-			outputBlob, err := repository.LookupBlob(outputEntry.Id)
+			outputBlob, err := repo.LookupBlob(outputEntry.Id)
 			if err != nil {
 				return nil, base.ErrorWithCategory(
 					ErrInternalGit,
@@ -459,7 +466,7 @@ func extractExampleCases(
 			)
 		}
 
-		statementsTree, err := repository.LookupTree(entry.Id)
+		statementsTree, err := repo.LookupTree(entry.Id)
 		if err != nil {
 			return nil, base.ErrorWithCategory(
 				ErrInternalGit,
@@ -479,7 +486,7 @@ func extractExampleCases(
 				continue
 			}
 
-			statementBlob, err := repository.LookupBlob(statementEntry.Id)
+			statementBlob, err := repo.LookupBlob(statementEntry.Id)
 			if err != nil {
 				if git.IsErrorCode(err, git.ErrorCodeNotFound) {
 					continue
@@ -507,14 +514,15 @@ func extractExampleCases(
 
 func validateUpdateMaster(
 	ctx context.Context,
-	repository *git.Repository,
+	repo *git.Repository,
 	newCommit *git.Commit,
 	allowDirectPush bool,
 	hardOverallWallTimeLimit base.Duration,
 	interactiveSettingsCompiler InteractiveSettingsCompiler,
 	log log15.Logger,
 ) error {
-	it, err := repository.NewReferenceIteratorGlob("refs/changes/*")
+	defer tracing.FromContext(ctx).StartSegment("validateUpdateMaster").End()
+	it, err := repo.NewReferenceIteratorGlob("refs/changes/*")
 	if err != nil {
 		return base.ErrorWithCategory(
 			ErrInternalGit,
@@ -579,7 +587,7 @@ func validateUpdateMaster(
 			errors.New("statements/ directory is not a tree"),
 		)
 	}
-	statementsTree, err := repository.LookupTree(statementsTreeEntry.Id)
+	statementsTree, err := repo.LookupTree(statementsTreeEntry.Id)
 	if err != nil {
 		return base.ErrorWithCategory(
 			ErrInternalGit,
@@ -602,7 +610,7 @@ func validateUpdateMaster(
 	}
 
 	// Validate and re-generate the problem settings.
-	problemSettings, err := getProblemSettings(repository, tree)
+	problemSettings, err := getProblemSettings(ctx, repo, tree)
 	if err != nil {
 		// getProblemSettings already wrapped the error correctly.
 		return err
@@ -617,7 +625,7 @@ func validateUpdateMaster(
 				errors.New("tests/ directory is not a tree"),
 			)
 		}
-		testsTree, err := repository.LookupTree(testsTreeEntry.Id)
+		testsTree, err := repo.LookupTree(testsTreeEntry.Id)
 		if err != nil {
 			return base.ErrorWithCategory(
 				ErrInternalGit,
@@ -636,7 +644,7 @@ func validateUpdateMaster(
 				errors.New("tests/tests.json is missing"),
 			)
 		}
-		testSettingsJSONBlob, err := repository.LookupBlob(testSettingsJSONEntry.Id)
+		testSettingsJSONBlob, err := repo.LookupBlob(testSettingsJSONEntry.Id)
 		if err != nil {
 			return base.ErrorWithCategory(
 				ErrInternalGit,
@@ -731,7 +739,7 @@ func validateUpdateMaster(
 				errors.New("interactive/ directory is not a tree"),
 			)
 		}
-		interactiveTree, err := repository.LookupTree(interactiveTreeEntry.Id)
+		interactiveTree, err := repo.LookupTree(interactiveTreeEntry.Id)
 		if err != nil {
 			return base.ErrorWithCategory(
 				ErrInternalGit,
@@ -800,7 +808,7 @@ func validateUpdateMaster(
 			)
 		}
 		if distribLang == "" {
-			mainSourceBlob, err := repository.LookupBlob(mainSourceOid)
+			mainSourceBlob, err := repo.LookupBlob(mainSourceOid)
 			if err != nil {
 				return base.ErrorWithCategory(
 					ErrInteractiveBadLayout,
@@ -828,7 +836,7 @@ func validateUpdateMaster(
 				),
 			)
 		} else {
-			mainDistribSourceBlob, err := repository.LookupBlob(mainDistribSourceOid)
+			mainDistribSourceBlob, err := repo.LookupBlob(mainDistribSourceOid)
 			if err != nil {
 				return base.ErrorWithCategory(
 					ErrInternalGit,
@@ -844,7 +852,7 @@ func validateUpdateMaster(
 			mainDistribSourceContents = mainDistribSourceBlob.Contents()
 		}
 
-		idlFileBlob, err := repository.LookupBlob(idlFileOid)
+		idlFileBlob, err := repo.LookupBlob(idlFileOid)
 		if err != nil {
 			return base.ErrorWithCategory(
 				ErrInternalGit,
@@ -947,7 +955,7 @@ func validateUpdateMaster(
 			Tolerance:        problemSettings.Validator.Tolerance,
 		},
 	}
-	if problemDistribSettings.Cases, err = extractExampleCases(repository, tree); err != nil {
+	if problemDistribSettings.Cases, err = extractExampleCases(ctx, repo, tree); err != nil {
 		// extractExampleCases already wrapped the error correctly.
 		return err
 	}
@@ -961,7 +969,7 @@ func validateUpdateMaster(
 			fmt.Sprintf("validator.distrib.%s", *problemSettings.Validator.Lang),
 		)
 		if validatorDistribTreeEntry != nil {
-			validatorDistribBlob, err := repository.LookupBlob(validatorDistribTreeEntry.Id)
+			validatorDistribBlob, err := repo.LookupBlob(validatorDistribTreeEntry.Id)
 			if err != nil {
 				return base.ErrorWithCategory(
 					ErrInternalGit,
@@ -1001,14 +1009,15 @@ func validateUpdateMaster(
 	return nil
 }
 
-func validateUpdatePublished(repository *git.Repository, newCommit *git.Commit) error {
-	head, err := repository.Head()
+func validateUpdatePublished(ctx context.Context, repo *git.Repository, newCommit *git.Commit) error {
+	defer tracing.FromContext(ctx).StartSegment("validateUpdatePublished").End()
+	head, err := repo.Head()
 	if err != nil {
 		// The master branch has not been yet created.
 		return ErrPublishedNotFromMaster
 	}
 	defer head.Free()
-	descendant, err := repository.DescendantOf(head.Target(), newCommit.Id())
+	descendant, err := repo.DescendantOf(head.Target(), newCommit.Id())
 	if err != nil {
 		return base.ErrorWithCategory(
 			ErrInternalGit,
@@ -1027,7 +1036,12 @@ func validateUpdatePublished(repository *git.Repository, newCommit *git.Commit) 
 	return nil
 }
 
-func (p *gitProtocol) validateUpdateConfig(repository *git.Repository, oldCommit, newCommit *git.Commit) error {
+func (p *gitProtocol) validateUpdateConfig(
+	ctx context.Context,
+	repo *git.Repository,
+	oldCommit, newCommit *git.Commit,
+) error {
+	defer tracing.FromContext(ctx).StartSegment("validateUpdateConfig").End()
 	newTree, err := newCommit.Tree()
 	if err != nil {
 		return base.ErrorWithCategory(
@@ -1058,7 +1072,7 @@ func (p *gitProtocol) validateUpdateConfig(repository *git.Repository, oldCommit
 			errors.New("refs/meta/config can only contain a single config.json file"),
 		)
 	}
-	configBlob, err := repository.LookupBlob(treeEntry.Id)
+	configBlob, err := repo.LookupBlob(treeEntry.Id)
 	if err != nil {
 		return base.ErrorWithCategory(
 			ErrInternalGit,
@@ -1097,7 +1111,8 @@ func (p *gitProtocol) validateUpdateConfig(repository *git.Repository, oldCommit
 	return nil
 }
 
-func validateUpdateReview(repository *git.Repository, oldCommit, newCommit *git.Commit) error {
+func validateUpdateReview(ctx context.Context, repo *git.Repository, oldCommit, newCommit *git.Commit) error {
+	defer tracing.FromContext(ctx).StartSegment("validateUpdateReview").End()
 	iterationUUID := ""
 
 	for _, line := range strings.Split(newCommit.Message(), "\n") {
@@ -1162,7 +1177,7 @@ func validateUpdateReview(repository *git.Repository, oldCommit, newCommit *git.
 			)
 		}
 
-		reviewBlob, err := repository.LookupBlob(treeEntry.Id)
+		reviewBlob, err := repo.LookupBlob(treeEntry.Id)
 		if err != nil {
 			return base.ErrorWithCategory(
 				ErrInternalGit,
@@ -1209,7 +1224,7 @@ func validateUpdateReview(repository *git.Repository, oldCommit, newCommit *git.
 				),
 			)
 		}
-		masterCommit, err := repository.LookupCommit(masterCommitOid)
+		masterCommit, err := repo.LookupCommit(masterCommitOid)
 		if err != nil {
 			return base.ErrorWithCategory(
 				ErrReviewBadLayout,
@@ -1264,7 +1279,7 @@ func validateUpdateReview(repository *git.Repository, oldCommit, newCommit *git.
 				newEntry = ledgerEntry
 			}
 
-			reviewBlob, err := repository.LookupBlob(treeEntry.Id)
+			reviewBlob, err := repo.LookupBlob(treeEntry.Id)
 			if err != nil {
 				return base.ErrorWithCategory(
 					ErrInternalGit,
@@ -1403,9 +1418,11 @@ func validateUpdateReview(repository *git.Repository, oldCommit, newCommit *git.
 }
 
 func (p *gitProtocol) validateChange(
-	repository *git.Repository,
+	ctx context.Context,
+	repo *git.Repository,
 	oldCommit, newCommit *git.Commit,
 ) error {
+	defer tracing.FromContext(ctx).StartSegment("validateChange").End()
 	newTree, err := newCommit.Tree()
 	if err != nil {
 		return base.ErrorWithCategory(
@@ -1439,7 +1456,7 @@ func (p *gitProtocol) validateChange(
 	if treeEntry == nil || treeEntry.Type != git.ObjectBlob {
 		return ErrChangeMissingSettingsJSON
 	}
-	settingsBlob, err := repository.LookupBlob(treeEntry.Id)
+	settingsBlob, err := repo.LookupBlob(treeEntry.Id)
 	if err != nil {
 		return base.ErrorWithCategory(
 			ErrInternalGit,
@@ -1470,11 +1487,12 @@ func (p *gitProtocol) validateChange(
 
 func (p *gitProtocol) validateUpdate(
 	ctx context.Context,
-	repository *git.Repository,
+	repo *git.Repository,
 	level githttp.AuthorizationLevel,
 	command *githttp.GitCommand,
 	oldCommit, newCommit *git.Commit,
 ) error {
+	defer tracing.FromContext(ctx).StartSegment("validateUpdate").End()
 	requestContext := request.FromContext(ctx)
 
 	p.log.Info(
@@ -1494,7 +1512,7 @@ func (p *gitProtocol) validateUpdate(
 	// Since we allow non-fast-forward refs globally, we need to check if the
 	// published branch is the one being updated.
 	if command.ReferenceName != "refs/heads/published" &&
-		!githttp.ValidateFastForward(repository, newCommit, command.Reference) {
+		!githttp.ValidateFastForward(repo, newCommit, command.Reference) {
 		p.log.Error(
 			"non-fast-forward is not allowed for this branch",
 			"ref", command.ReferenceName,
@@ -1544,7 +1562,7 @@ func (p *gitProtocol) validateUpdate(
 		}
 		return validateUpdateMaster(
 			ctx,
-			repository,
+			repo,
 			newCommit,
 			p.allowDirectPushToMaster,
 			p.hardOverallWallTimeLimit,
@@ -1560,7 +1578,7 @@ func (p *gitProtocol) validateUpdate(
 			)
 			return githttp.ErrForbidden
 		}
-		return validateUpdatePublished(repository, newCommit)
+		return validateUpdatePublished(ctx, repo, newCommit)
 	} else if command.ReferenceName == "refs/meta/config" {
 		if !requestContext.Request.IsAdmin {
 			p.log.Error(
@@ -1570,7 +1588,7 @@ func (p *gitProtocol) validateUpdate(
 			)
 			return githttp.ErrForbidden
 		}
-		return p.validateUpdateConfig(repository, oldCommit, newCommit)
+		return p.validateUpdateConfig(ctx, repo, oldCommit, newCommit)
 	} else if command.ReferenceName == "refs/meta/review" {
 		if !requestContext.Request.CanEdit && !requestContext.Request.HasSolved {
 			p.log.Error(
@@ -1580,7 +1598,7 @@ func (p *gitProtocol) validateUpdate(
 			)
 			return githttp.ErrForbidden
 		}
-		return validateUpdateReview(repository, oldCommit, newCommit)
+		return validateUpdateReview(ctx, repo, oldCommit, newCommit)
 	}
 
 	if !requestContext.Request.CanEdit && !requestContext.Request.HasSolved {
@@ -1591,17 +1609,19 @@ func (p *gitProtocol) validateUpdate(
 		)
 		return githttp.ErrForbidden
 	}
-	return p.validateChange(repository, oldCommit, newCommit)
+	return p.validateChange(ctx, repo, oldCommit, newCommit)
 }
 
 func (p *gitProtocol) preprocessMaster(
 	ctx context.Context,
-	originalRepository *git.Repository,
+	originalRepo *git.Repository,
 	tmpDir string,
 	originalPackPath string,
 	originalCommands []*githttp.GitCommand,
 ) (string, []*githttp.GitCommand, error) {
-	originalCommit, err := originalRepository.LookupCommit(originalCommands[0].New)
+	txn := tracing.FromContext(ctx)
+	defer txn.StartSegment("preprocessMaster").End()
+	originalCommit, err := originalRepo.LookupCommit(originalCommands[0].New)
 	if err != nil {
 		return originalPackPath, originalCommands, base.ErrorWithCategory(
 			ErrInternalGit,
@@ -1622,7 +1642,7 @@ func (p *gitProtocol) preprocessMaster(
 		})
 		description := &commitDescriptions[len(commitDescriptions)-1]
 
-		ref, err := originalRepository.References.Lookup(description.ReferenceName)
+		ref, err := originalRepo.References.Lookup(description.ReferenceName)
 		if err != nil {
 			if git.IsErrorCode(err, git.ErrorCodeNotFound) {
 				continue
@@ -1639,7 +1659,7 @@ func (p *gitProtocol) preprocessMaster(
 		defer ref.Free()
 
 		description.Reference = ref
-		commit, err := originalRepository.LookupCommit(ref.Target())
+		commit, err := originalRepo.LookupCommit(ref.Target())
 		if err != nil {
 			return originalPackPath, originalCommands, base.ErrorWithCategory(
 				ErrInternalGit,
@@ -1655,7 +1675,7 @@ func (p *gitProtocol) preprocessMaster(
 		description.ParentCommit = commit
 	}
 
-	masterRef, err := originalRepository.References.Lookup("refs/heads/master")
+	masterRef, err := originalRepo.References.Lookup("refs/heads/master")
 	var masterCommit *git.Commit
 	if err != nil && !git.IsErrorCode(err, git.ErrorCodeNotFound) {
 		return originalPackPath, originalCommands, base.ErrorWithCategory(
@@ -1669,7 +1689,7 @@ func (p *gitProtocol) preprocessMaster(
 	if masterRef != nil {
 		defer masterRef.Free()
 
-		masterCommit, err = originalRepository.LookupCommit(masterRef.Target())
+		masterCommit, err = originalRepo.LookupCommit(masterRef.Target())
 		if err != nil {
 			return originalPackPath, originalCommands, base.ErrorWithCategory(
 				ErrInternalGit,
@@ -1691,8 +1711,9 @@ func (p *gitProtocol) preprocessMaster(
 	}
 
 	newPackPath := filepath.Join(tmpDir, "new.pack")
+	spliceCommitSegment := txn.StartSegment("SpliceCommit")
 	newCommands, err := githttp.SpliceCommit(
-		originalRepository,
+		originalRepo,
 		originalCommit,
 		masterCommit,
 		requestContext.UpdatedFiles,
@@ -1705,6 +1726,7 @@ func (p *gitProtocol) preprocessMaster(
 		newPackPath,
 		p.log,
 	)
+	spliceCommitSegment.End()
 	if err != nil {
 		return originalPackPath, originalCommands, base.ErrorWithCategory(
 			ErrInternalGit,
@@ -1719,14 +1741,15 @@ func (p *gitProtocol) preprocessMaster(
 
 func (p *gitProtocol) preprocess(
 	ctx context.Context,
-	originalRepository *git.Repository,
+	originalRepo *git.Repository,
 	tmpDir string,
 	originalPackPath string,
 	originalCommands []*githttp.GitCommand,
 ) (string, []*githttp.GitCommand, error) {
+	defer tracing.FromContext(ctx).StartSegment("preprocess").End()
 	p.log.Info("Updating", "reference", originalCommands)
 	if originalCommands[0].ReferenceName == "refs/heads/master" {
-		return p.preprocessMaster(ctx, originalRepository, tmpDir, originalPackPath, originalCommands)
+		return p.preprocessMaster(ctx, originalRepo, tmpDir, originalPackPath, originalCommands)
 	}
 	return originalPackPath, originalCommands, nil
 }
@@ -1761,8 +1784,11 @@ func NewGitHandler(opts GitHandlerOpts) http.Handler {
 // InitRepository is a wrapper around git.CreateRepository() that also adds
 // omegaUp-specific files to the repository.
 func InitRepository(
+	ctx context.Context,
 	repositoryPath string,
 ) (*git.Repository, error) {
+	defer tracing.FromContext(ctx).StartSegment("InitRepository").End()
+
 	repo, err := git.InitRepository(repositoryPath, true)
 	if err != nil {
 		return nil, base.ErrorWithCategory(

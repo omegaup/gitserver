@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"io/ioutil"
 	"os"
 	"path"
@@ -18,6 +19,7 @@ func TestRoundtrip(t *testing.T) {
 	if os.Getenv("PRESERVE") == "" {
 		defer os.RemoveAll(dirName)
 	}
+	ctx := context.Background()
 
 	log := base.StderrLog(false)
 
@@ -27,7 +29,7 @@ func TestRoundtrip(t *testing.T) {
 	if err := mergeRepository("testdata/sumas.git", mergedPath, log); err != nil {
 		t.Fatalf("failed to merge repository: %v", err)
 	}
-	got, err := unmergeRepository(mergedPath, unmergedPath, false, log)
+	got, err := unmergeRepository(ctx, mergedPath, unmergedPath, false, log)
 	if err != nil {
 		t.Fatalf("failed to unmerge repository: %v", err)
 	}
