@@ -8,15 +8,16 @@ require (
 	github.com/go-sql-driver/mysql v1.5.0
 	github.com/go-stack/stack v1.8.0 // indirect
 	github.com/inconshreveable/log15 v0.0.0-20201112154412-8562bdadbbac
-	github.com/libgit2/git2go/v32 v32.0.4
+	github.com/libgit2/git2go/v33 v33.0.4
 	github.com/mattn/go-colorable v0.1.8 // indirect
 	github.com/mattn/go-isatty v0.0.12 // indirect
 	github.com/mattn/go-sqlite3 v1.14.8
 	github.com/newrelic/go-agent/v3 v3.15.1
 	github.com/o1egl/paseto v1.0.0
-	github.com/omegaup/githttp v1.5.0
-	github.com/omegaup/go-base/v2 v2.1.0
-	github.com/omegaup/quark v1.7.0
+	github.com/omegaup/githttp/v2 v2.2.0
+	github.com/omegaup/go-base/tracing/newrelic v0.0.0-20211201150123-3ace5d86e12a
+	github.com/omegaup/go-base/v2 v2.3.0
+	github.com/omegaup/quark v1.8.0
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus/client_golang v1.8.0
 	github.com/saintfish/chardet v0.0.0-20120816061221-3af4cd4741ca

@@ -12,8 +12,8 @@ import (
 	"strings"
 
 	"github.com/inconshreveable/log15"
-	git "github.com/libgit2/git2go/v32"
-	"github.com/omegaup/githttp"
+	git "github.com/libgit2/git2go/v33"
+	"github.com/omegaup/githttp/v2"
 	"github.com/omegaup/gitserver"
 	"github.com/omegaup/gitserver/request"
 	base "github.com/omegaup/go-base/v2"
@@ -135,14 +135,10 @@ func createPackfileFromSplitCommit(
 	lockfile := githttp.NewLockfile(destRepo.Path())
 	defer lockfile.Unlock()
 
-	protocol := githttp.NewGitProtocol(
-		nil,
-		nil,
-		nil,
-		nil,
-		true,
-		log,
-	)
+	protocol := githttp.NewGitProtocol(githttp.GitProtocolOpts{
+		AllowNonFastForward: true,
+		Log:                 log,
+	})
 
 	var oldCommitID *git.Oid
 	if head != nil {
@@ -371,17 +367,17 @@ func createPackfileFromMergedCommit(
 	lockfile := githttp.NewLockfile(destRepo.Path())
 	defer lockfile.Unlock()
 
-	protocol := gitserver.NewGitProtocol(
-		nil,
-		nil,
-		true,
-		gitserver.OverallWallTimeHardLimit,
-		&gitserver.LibinteractiveCompiler{
+	protocol := gitserver.NewGitProtocol(gitserver.GitProtocolOpts{
+		GitProtocolOpts: githttp.GitProtocolOpts{
+			Log: log,
+		},
+		AllowDirectPushToMaster:  true,
+		HardOverallWallTimeLimit: gitserver.OverallWallTimeHardLimit,
+		InteractiveSettingsCompiler: &gitserver.LibinteractiveCompiler{
 			LibinteractiveJarPath: "/usr/share/java/libinteractive.jar",
 			Log:                   log,
 		},
-		log,
-	)
+	})
 
 	var oldCommitID *git.Oid
 	if head != nil {

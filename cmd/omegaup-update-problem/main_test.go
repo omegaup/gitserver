@@ -11,8 +11,8 @@ import (
 	"testing"
 
 	"github.com/inconshreveable/log15"
-	git "github.com/libgit2/git2go/v32"
-	"github.com/omegaup/githttp"
+	git "github.com/libgit2/git2go/v33"
+	"github.com/omegaup/githttp/v2"
 	"github.com/omegaup/gitserver"
 	"github.com/omegaup/gitserver/gitservertest"
 	base "github.com/omegaup/go-base/v2"

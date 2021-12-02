@@ -11,6 +11,7 @@ import (
 	"strconv"
 	"testing"
 
+	"github.com/omegaup/githttp/v2"
 	"github.com/omegaup/gitserver"
 	base "github.com/omegaup/go-base/v2"
 )
@@ -53,7 +54,14 @@ func TestHealth(t *testing.T) {
 		nil,
 		config.Gitserver.Port,
 		tmpDir,
-		gitserver.NewGitProtocol(authorize, nil, false, gitserver.OverallWallTimeHardLimit, fakeInteractiveSettingsCompiler, log),
+		gitserver.NewGitProtocol(gitserver.GitProtocolOpts{
+			GitProtocolOpts: githttp.GitProtocolOpts{
+				AuthCallback: authorize,
+				Log:          log,
+			},
+			HardOverallWallTimeLimit:    gitserver.OverallWallTimeHardLimit,
+			InteractiveSettingsCompiler: fakeInteractiveSettingsCompiler,
+		}),
 		log,
 	)
 	ts.Start()

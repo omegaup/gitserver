@@ -19,12 +19,13 @@ import (
 	"strings"
 	"time"
 
-	"github.com/inconshreveable/log15"
-	git "github.com/libgit2/git2go/v32"
-	"github.com/omegaup/githttp"
+	"github.com/omegaup/githttp/v2"
 	"github.com/omegaup/gitserver/request"
 	base "github.com/omegaup/go-base/v2"
 	"github.com/omegaup/quark/common"
+
+	"github.com/inconshreveable/log15"
+	git "github.com/libgit2/git2go/v33"
 	"github.com/pkg/errors"
 )
 
@@ -1572,17 +1573,26 @@ func (h *zipUploadHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNotFound)
 }
 
-// ZipHandler is the HTTP handler that allows uploading .zip files.
-func ZipHandler(
-	rootPath string,
-	protocol *githttp.GitProtocol,
-	metrics base.Metrics,
-	log log15.Logger,
-) http.Handler {
+// ZipHandlerOpts contains all the possible options to initialize the zip handler.
+type ZipHandlerOpts struct {
+	RootPath string
+	Protocol *githttp.GitProtocol
+	Metrics  base.Metrics
+	Log      log15.Logger
+}
+
+// NewZipHandler is the HTTP handler that allows uploading .zip files.
+func NewZipHandler(opts ZipHandlerOpts) http.Handler {
+	if opts.Metrics == nil {
+		opts.Metrics = &base.NoOpMetrics{}
+	}
+	if opts.Log == nil {
+		opts.Log = log15.New()
+	}
 	return &zipUploadHandler{
-		rootPath: rootPath,
-		protocol: protocol,
-		metrics:  metrics,
-		log:      log,
+		rootPath: opts.RootPath,
+		protocol: opts.Protocol,
+		metrics:  opts.Metrics,
+		log:      opts.Log,
 	}
 }

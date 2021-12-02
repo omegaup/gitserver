@@ -13,8 +13,8 @@ import (
 	"syscall"
 	"time"
 
-	git "github.com/libgit2/git2go/v32"
-	"github.com/omegaup/githttp"
+	git "github.com/libgit2/git2go/v33"
+	"github.com/omegaup/githttp/v2"
 	"github.com/omegaup/gitserver"
 	"github.com/omegaup/gitserver/request"
 	base "github.com/omegaup/go-base/v2"
@@ -83,8 +83,18 @@ func muxHandler(
 	log log15.Logger,
 ) http.Handler {
 	metrics, metricsHandler := gitserver.SetupMetrics(ProgramVersion)
-	_, wrappedGitHandler := newrelic.WrapHandle(app, "/", gitserver.GitHandler(rootPath, protocol, metrics, log))
-	_, wrappedZipHandler := newrelic.WrapHandle(app, "/", gitserver.ZipHandler(rootPath, protocol, metrics, log))
+	_, wrappedGitHandler := newrelic.WrapHandle(app, "/", gitserver.NewGitHandler(gitserver.GitHandlerOpts{
+		RootPath: rootPath,
+		Protocol: protocol,
+		Metrics:  metrics,
+		Log:      log,
+	}))
+	_, wrappedZipHandler := newrelic.WrapHandle(app, "/", gitserver.NewZipHandler(gitserver.ZipHandlerOpts{
+		RootPath: rootPath,
+		Protocol: protocol,
+		Metrics:  metrics,
+		Log:      log,
+	}))
 	_, wrappedHealthHandler := newrelic.WrapHandle(app, "/health", gitserver.HealthHandler(port))
 	_, wrappedMetricsHandler := newrelic.WrapHandle(app, "/metrics", metricsHandler)
 	return &muxGitHandler{
@@ -203,17 +213,19 @@ func main() {
 		os.Exit(1)
 	}
 
-	protocol := gitserver.NewGitProtocol(
-		authCallback,
-		referenceDiscovery,
-		config.Gitserver.AllowDirectPushToMaster,
-		gitserver.OverallWallTimeHardLimit,
-		&gitserver.LibinteractiveCompiler{
+	protocol := gitserver.NewGitProtocol(gitserver.GitProtocolOpts{
+		GitProtocolOpts: githttp.GitProtocolOpts{
+			AuthCallback:               authCallback,
+			ReferenceDiscoveryCallback: referenceDiscovery,
+			Log:                        log,
+		},
+		AllowDirectPushToMaster:  config.Gitserver.AllowDirectPushToMaster,
+		HardOverallWallTimeLimit: gitserver.OverallWallTimeHardLimit,
+		InteractiveSettingsCompiler: &gitserver.LibinteractiveCompiler{
 			LibinteractiveJarPath: config.Gitserver.LibinteractivePath,
 			Log:                   log,
 		},
-		log,
-	)
+	})
 
 	var servers []*http.Server
 	var wg sync.WaitGroup

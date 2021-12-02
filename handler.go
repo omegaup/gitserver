@@ -18,12 +18,13 @@ import (
 	"time"
 	"unicode/utf8"
 
-	"github.com/inconshreveable/log15"
-	git "github.com/libgit2/git2go/v32"
-	"github.com/omegaup/githttp"
+	"github.com/omegaup/githttp/v2"
 	"github.com/omegaup/gitserver/request"
 	base "github.com/omegaup/go-base/v2"
 	"github.com/omegaup/quark/common"
+
+	"github.com/inconshreveable/log15"
+	git "github.com/libgit2/git2go/v33"
 	"github.com/pkg/errors"
 )
 
@@ -209,30 +210,31 @@ type gitProtocol struct {
 	log                         log15.Logger
 }
 
+// GitProtocolOpts contains all the possible options to initialize the git protocol.
+type GitProtocolOpts struct {
+	githttp.GitProtocolOpts
+
+	AllowDirectPushToMaster     bool
+	HardOverallWallTimeLimit    base.Duration
+	InteractiveSettingsCompiler InteractiveSettingsCompiler
+}
+
 // NewGitProtocol creates a new GitProtocol with the provided authorization
 // callback.
-func NewGitProtocol(
-	authCallback githttp.AuthorizationCallback,
-	referenceDiscoveryCallback githttp.ReferenceDiscoveryCallback,
-	allowDirectPushToMaster bool,
-	hardOverallWallTimeLimit base.Duration,
-	interactiveSettingsCompiler InteractiveSettingsCompiler,
-	log log15.Logger,
-) *githttp.GitProtocol {
-	protocol := &gitProtocol{
-		allowDirectPushToMaster:     allowDirectPushToMaster,
-		hardOverallWallTimeLimit:    hardOverallWallTimeLimit,
-		interactiveSettingsCompiler: interactiveSettingsCompiler,
-		log:                         log,
+func NewGitProtocol(opts GitProtocolOpts) *githttp.GitProtocol {
+	if opts.Log == nil {
+		opts.Log = log15.New()
 	}
-	return githttp.NewGitProtocol(
-		authCallback,
-		referenceDiscoveryCallback,
-		protocol.validateUpdate,
-		protocol.preprocess,
-		true,
-		log,
-	)
+	protocol := &gitProtocol{
+		allowDirectPushToMaster:     opts.AllowDirectPushToMaster,
+		hardOverallWallTimeLimit:    opts.HardOverallWallTimeLimit,
+		interactiveSettingsCompiler: opts.InteractiveSettingsCompiler,
+		log:                         opts.Log,
+	}
+	opts.AllowNonFastForward = true
+	opts.UpdateCallback = protocol.validateUpdate
+	opts.PreprocessCallback = protocol.preprocess
+	return githttp.NewGitProtocol(opts.GitProtocolOpts)
 }
 
 func getProblemSettings(repo *git.Repository, tree *git.Tree) (*common.ProblemSettings, error) {
@@ -1728,23 +1730,29 @@ func (p *gitProtocol) preprocess(
 	return originalPackPath, originalCommands, nil
 }
 
-// GitHandler is the HTTP handler for the omegaUp git server.
-func GitHandler(
-	rootPath string,
-	protocol *githttp.GitProtocol,
-	metrics base.Metrics,
-	log log15.Logger,
-) http.Handler {
-	return githttp.GitServer(
-		rootPath,
-		"",
-		true,
-		protocol,
-		func(ctx context.Context) context.Context {
-			return request.NewContext(ctx, metrics)
+// GitHandlerOpts contains all the possible options to initialize the git Server.
+type GitHandlerOpts struct {
+	RootPath string
+	Protocol *githttp.GitProtocol
+	Metrics  base.Metrics
+	Log      log15.Logger
+}
+
+// NewGitHandler is the HTTP handler for the omegaUp git server.
+func NewGitHandler(opts GitHandlerOpts) http.Handler {
+	if opts.Metrics == nil {
+		opts.Metrics = &base.NoOpMetrics{}
+	}
+	return githttp.NewGitServer(githttp.GitServerOpts{
+		RootPath:         opts.RootPath,
+		RepositorySuffix: "",
+		EnableBrowse:     true,
+		Protocol:         opts.Protocol,
+		ContextCallback: func(ctx context.Context) context.Context {
+			return request.NewContext(ctx, opts.Metrics)
 		},
-		log,
-	)
+		Log: opts.Log,
+	})
 }
 
 // InitRepository is a wrapper around git.CreateRepository() that also adds
