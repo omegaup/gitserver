@@ -17,10 +17,12 @@ import (
 	"testing"
 	"time"
 
-	git "github.com/libgit2/git2go/v32"
+	"github.com/omegaup/githttp/v2"
 	"github.com/omegaup/gitserver/gitservertest"
 	base "github.com/omegaup/go-base/v2"
 	"github.com/omegaup/quark/common"
+
+	git "github.com/libgit2/git2go/v33"
 )
 
 func wrapReaders(contents map[string]string) map[string]io.Reader {
@@ -153,12 +155,19 @@ func TestPushZip(t *testing.T) {
 	}
 
 	log := base.StderrLog(false)
-	ts := httptest.NewServer(ZipHandler(
-		tmpDir,
-		NewGitProtocol(authorize, nil, true, OverallWallTimeHardLimit, fakeInteractiveSettingsCompiler, log),
-		&base.NoOpMetrics{},
-		log,
-	))
+	ts := httptest.NewServer(NewZipHandler(ZipHandlerOpts{
+		RootPath: tmpDir,
+		Protocol: NewGitProtocol(GitProtocolOpts{
+			GitProtocolOpts: githttp.GitProtocolOpts{
+				AuthCallback: authorize,
+				Log:          log,
+			},
+			AllowDirectPushToMaster:     true,
+			HardOverallWallTimeLimit:    OverallWallTimeHardLimit,
+			InteractiveSettingsCompiler: fakeInteractiveSettingsCompiler,
+		}),
+		Log: log,
+	}))
 	defer ts.Close()
 
 	problemAlias := "sumas"
@@ -305,12 +314,19 @@ func TestZiphandlerCases(t *testing.T) {
 
 	log := base.StderrLog(false)
 
-	ts := httptest.NewServer(ZipHandler(
-		tmpDir,
-		NewGitProtocol(authorize, nil, true, OverallWallTimeHardLimit, fakeInteractiveSettingsCompiler, log),
-		&base.NoOpMetrics{},
-		log,
-	))
+	ts := httptest.NewServer(NewZipHandler(ZipHandlerOpts{
+		RootPath: tmpDir,
+		Protocol: NewGitProtocol(GitProtocolOpts{
+			GitProtocolOpts: githttp.GitProtocolOpts{
+				AuthCallback: authorize,
+				Log:          log,
+			},
+			AllowDirectPushToMaster:     true,
+			HardOverallWallTimeLimit:    OverallWallTimeHardLimit,
+			InteractiveSettingsCompiler: fakeInteractiveSettingsCompiler,
+		}),
+		Log: log,
+	}))
 	defer ts.Close()
 
 	for name, tc := range map[string]struct {
@@ -386,12 +402,19 @@ func TestZiphandlerSolutions(t *testing.T) {
 
 	log := base.StderrLog(false)
 
-	ts := httptest.NewServer(ZipHandler(
-		tmpDir,
-		NewGitProtocol(authorize, nil, true, OverallWallTimeHardLimit, fakeInteractiveSettingsCompiler, log),
-		&base.NoOpMetrics{},
-		log,
-	))
+	ts := httptest.NewServer(NewZipHandler(ZipHandlerOpts{
+		RootPath: tmpDir,
+		Protocol: NewGitProtocol(GitProtocolOpts{
+			GitProtocolOpts: githttp.GitProtocolOpts{
+				AuthCallback: authorize,
+				Log:          log,
+			},
+			AllowDirectPushToMaster:     true,
+			HardOverallWallTimeLimit:    OverallWallTimeHardLimit,
+			InteractiveSettingsCompiler: fakeInteractiveSettingsCompiler,
+		}),
+		Log: log,
+	}))
 	defer ts.Close()
 	zipContents, err := gitservertest.CreateZip(
 		map[string]io.Reader{
@@ -605,12 +628,19 @@ func TestUpdateProblemSettings(t *testing.T) {
 	}
 
 	log := base.StderrLog(false)
-	ts := httptest.NewServer(ZipHandler(
-		tmpDir,
-		NewGitProtocol(authorize, nil, true, OverallWallTimeHardLimit, fakeInteractiveSettingsCompiler, log),
-		&base.NoOpMetrics{},
-		log,
-	))
+	ts := httptest.NewServer(NewZipHandler(ZipHandlerOpts{
+		RootPath: tmpDir,
+		Protocol: NewGitProtocol(GitProtocolOpts{
+			GitProtocolOpts: githttp.GitProtocolOpts{
+				AuthCallback: authorize,
+				Log:          log,
+			},
+			AllowDirectPushToMaster:     true,
+			HardOverallWallTimeLimit:    OverallWallTimeHardLimit,
+			InteractiveSettingsCompiler: fakeInteractiveSettingsCompiler,
+		}),
+		Log: log,
+	}))
 	defer ts.Close()
 
 	problemAlias := "sumas"
@@ -743,12 +773,19 @@ func TestUpdateProblemSettingsWithCustomValidator(t *testing.T) {
 	}
 
 	log := base.StderrLog(false)
-	ts := httptest.NewServer(ZipHandler(
-		tmpDir,
-		NewGitProtocol(authorize, nil, true, OverallWallTimeHardLimit, fakeInteractiveSettingsCompiler, log),
-		&base.NoOpMetrics{},
-		log,
-	))
+	ts := httptest.NewServer(NewZipHandler(ZipHandlerOpts{
+		RootPath: tmpDir,
+		Protocol: NewGitProtocol(GitProtocolOpts{
+			GitProtocolOpts: githttp.GitProtocolOpts{
+				AuthCallback: authorize,
+				Log:          log,
+			},
+			AllowDirectPushToMaster:     true,
+			HardOverallWallTimeLimit:    OverallWallTimeHardLimit,
+			InteractiveSettingsCompiler: fakeInteractiveSettingsCompiler,
+		}),
+		Log: log,
+	}))
 	defer ts.Close()
 
 	problemAlias := "sumas-validator"
@@ -994,12 +1031,19 @@ func TestRenameProblem(t *testing.T) {
 	}
 
 	log := base.StderrLog(false)
-	ts := httptest.NewServer(ZipHandler(
-		tmpDir,
-		NewGitProtocol(authorize, nil, true, OverallWallTimeHardLimit, fakeInteractiveSettingsCompiler, log),
-		&base.NoOpMetrics{},
-		log,
-	))
+	ts := httptest.NewServer(NewZipHandler(ZipHandlerOpts{
+		RootPath: tmpDir,
+		Protocol: NewGitProtocol(GitProtocolOpts{
+			GitProtocolOpts: githttp.GitProtocolOpts{
+				AuthCallback: authorize,
+				Log:          log,
+			},
+			AllowDirectPushToMaster:     true,
+			HardOverallWallTimeLimit:    OverallWallTimeHardLimit,
+			InteractiveSettingsCompiler: fakeInteractiveSettingsCompiler,
+		}),
+		Log: log,
+	}))
 	defer ts.Close()
 
 	problemAlias := "sumas-validator"

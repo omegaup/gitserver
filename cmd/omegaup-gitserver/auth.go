@@ -14,7 +14,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/omegaup/githttp"
+	"github.com/omegaup/githttp/v2"
 	"github.com/omegaup/gitserver/request"
 
 	_ "github.com/go-sql-driver/mysql"

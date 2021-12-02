@@ -15,8 +15,8 @@ import (
 	"time"
 
 	"github.com/inconshreveable/log15"
-	git "github.com/libgit2/git2go/v32"
-	"github.com/omegaup/githttp"
+	git "github.com/libgit2/git2go/v33"
+	"github.com/omegaup/githttp/v2"
 	"github.com/omegaup/gitserver"
 	"github.com/omegaup/gitserver/request"
 	base "github.com/omegaup/go-base/v2"
@@ -73,17 +73,17 @@ func commitZipFile(
 	requestContext.Request.CanView = true
 	requestContext.Request.CanEdit = true
 
-	protocol := gitserver.NewGitProtocol(
-		nil,
-		nil,
-		true,
-		gitserver.OverallWallTimeHardLimit,
-		&gitserver.LibinteractiveCompiler{
+	protocol := gitserver.NewGitProtocol(gitserver.GitProtocolOpts{
+		GitProtocolOpts: githttp.GitProtocolOpts{
+			Log: log,
+		},
+		AllowDirectPushToMaster:  true,
+		HardOverallWallTimeLimit: gitserver.OverallWallTimeHardLimit,
+		InteractiveSettingsCompiler: &gitserver.LibinteractiveCompiler{
 			LibinteractiveJarPath: *libinteractivePath,
 			Log:                   log,
 		},
-		log,
-	)
+	})
 
 	return gitserver.PushZip(
 		ctx,
@@ -296,16 +296,16 @@ func commitBlobs(
 	requestContext.Request.CanView = true
 	requestContext.Request.CanEdit = true
 
-	protocol := gitserver.NewGitProtocol(
-		nil,
-		nil,
-		true,
-		gitserver.OverallWallTimeHardLimit,
-		&gitserver.LibinteractiveCompiler{
+	protocol := gitserver.NewGitProtocol(gitserver.GitProtocolOpts{
+		GitProtocolOpts: githttp.GitProtocolOpts{
+			Log: log,
+		},
+		AllowDirectPushToMaster:  true,
+		HardOverallWallTimeLimit: gitserver.OverallWallTimeHardLimit,
+		InteractiveSettingsCompiler: &gitserver.LibinteractiveCompiler{
 			LibinteractiveJarPath: *libinteractivePath,
 		},
-		log,
-	)
+	})
 	updatedRefs, err, unpackErr := protocol.PushPackfile(
 		ctx,
 		repo,

@@ -19,13 +19,14 @@ import (
 	"testing"
 	"time"
 
-	"github.com/inconshreveable/log15"
-	git "github.com/libgit2/git2go/v32"
-	"github.com/omegaup/githttp"
+	"github.com/omegaup/githttp/v2"
 	"github.com/omegaup/gitserver/gitservertest"
 	"github.com/omegaup/gitserver/request"
 	base "github.com/omegaup/go-base/v2"
 	"github.com/omegaup/quark/common"
+
+	"github.com/inconshreveable/log15"
+	git "github.com/libgit2/git2go/v33"
 )
 
 const (
@@ -289,12 +290,18 @@ func TestInvalidRef(t *testing.T) {
 	}
 
 	log := base.StderrLog(false)
-	ts := httptest.NewServer(GitHandler(
-		tmpDir,
-		NewGitProtocol(authorize, nil, false, OverallWallTimeHardLimit, fakeInteractiveSettingsCompiler, log),
-		&base.NoOpMetrics{},
-		log,
-	))
+	ts := httptest.NewServer(NewGitHandler(GitHandlerOpts{
+		RootPath: tmpDir,
+		Protocol: NewGitProtocol(GitProtocolOpts{
+			GitProtocolOpts: githttp.GitProtocolOpts{
+				AuthCallback: authorize,
+				Log:          log,
+			},
+			HardOverallWallTimeLimit:    OverallWallTimeHardLimit,
+			InteractiveSettingsCompiler: fakeInteractiveSettingsCompiler,
+		}),
+		Log: log,
+	}))
 	defer ts.Close()
 
 	problemAlias := "sumas"
@@ -361,12 +368,18 @@ func TestDelete(t *testing.T) {
 	}
 
 	log := base.StderrLog(false)
-	ts := httptest.NewServer(GitHandler(
-		tmpDir,
-		NewGitProtocol(authorize, nil, false, OverallWallTimeHardLimit, fakeInteractiveSettingsCompiler, log),
-		&base.NoOpMetrics{},
-		log,
-	))
+	ts := httptest.NewServer(NewGitHandler(GitHandlerOpts{
+		RootPath: tmpDir,
+		Protocol: NewGitProtocol(GitProtocolOpts{
+			GitProtocolOpts: githttp.GitProtocolOpts{
+				AuthCallback: authorize,
+				Log:          log,
+			},
+			HardOverallWallTimeLimit:    OverallWallTimeHardLimit,
+			InteractiveSettingsCompiler: fakeInteractiveSettingsCompiler,
+		}),
+		Log: log,
+	}))
 	defer ts.Close()
 
 	problemAlias := "sumas"
@@ -436,12 +449,18 @@ func TestServerCreateReview(t *testing.T) {
 	}
 
 	log := base.StderrLog(false)
-	ts := httptest.NewServer(GitHandler(
-		tmpDir,
-		NewGitProtocol(authorize, nil, false, OverallWallTimeHardLimit, fakeInteractiveSettingsCompiler, log),
-		&base.NoOpMetrics{},
-		log,
-	))
+	ts := httptest.NewServer(NewGitHandler(GitHandlerOpts{
+		RootPath: tmpDir,
+		Protocol: NewGitProtocol(GitProtocolOpts{
+			GitProtocolOpts: githttp.GitProtocolOpts{
+				AuthCallback: authorize,
+				Log:          log,
+			},
+			HardOverallWallTimeLimit:    OverallWallTimeHardLimit,
+			InteractiveSettingsCompiler: fakeInteractiveSettingsCompiler,
+		}),
+		Log: log,
+	}))
 	defer ts.Close()
 
 	problemAlias := "sumas"
@@ -1225,12 +1244,18 @@ func TestPushGitbomb(t *testing.T) {
 	}
 
 	log := base.StderrLog(false)
-	ts := httptest.NewServer(GitHandler(
-		tmpDir,
-		NewGitProtocol(authorize, nil, false, OverallWallTimeHardLimit, fakeInteractiveSettingsCompiler, log),
-		&base.NoOpMetrics{},
-		log,
-	))
+	ts := httptest.NewServer(NewGitHandler(GitHandlerOpts{
+		RootPath: tmpDir,
+		Protocol: NewGitProtocol(GitProtocolOpts{
+			GitProtocolOpts: githttp.GitProtocolOpts{
+				AuthCallback: authorize,
+				Log:          log,
+			},
+			HardOverallWallTimeLimit:    OverallWallTimeHardLimit,
+			InteractiveSettingsCompiler: fakeInteractiveSettingsCompiler,
+		}),
+		Log: log,
+	}))
 	defer ts.Close()
 
 	problemAlias := "sumas"
@@ -1342,12 +1367,18 @@ func TestConfig(t *testing.T) {
 	}
 
 	log := base.StderrLog(false)
-	ts := httptest.NewServer(GitHandler(
-		tmpDir,
-		NewGitProtocol(authorize, nil, false, OverallWallTimeHardLimit, fakeInteractiveSettingsCompiler, log),
-		&base.NoOpMetrics{},
-		log,
-	))
+	ts := httptest.NewServer(NewGitHandler(GitHandlerOpts{
+		RootPath: tmpDir,
+		Protocol: NewGitProtocol(GitProtocolOpts{
+			GitProtocolOpts: githttp.GitProtocolOpts{
+				AuthCallback: authorize,
+				Log:          log,
+			},
+			HardOverallWallTimeLimit:    OverallWallTimeHardLimit,
+			InteractiveSettingsCompiler: fakeInteractiveSettingsCompiler,
+		}),
+		Log: log,
+	}))
 	defer ts.Close()
 
 	problemAlias := "sumas"
@@ -1689,14 +1720,16 @@ func TestInteractive(t *testing.T) {
 	}
 
 	log := base.StderrLog(false)
-	ts := httptest.NewServer(GitHandler(
-		tmpDir,
-		NewGitProtocol(
-			authorize,
-			nil,
-			true,
-			OverallWallTimeHardLimit,
-			&FakeInteractiveSettingsCompiler{
+	ts := httptest.NewServer(NewGitHandler(GitHandlerOpts{
+		RootPath: tmpDir,
+		Protocol: NewGitProtocol(GitProtocolOpts{
+			GitProtocolOpts: githttp.GitProtocolOpts{
+				AuthCallback: authorize,
+				Log:          log,
+			},
+			AllowDirectPushToMaster:  true,
+			HardOverallWallTimeLimit: OverallWallTimeHardLimit,
+			InteractiveSettingsCompiler: &FakeInteractiveSettingsCompiler{
 				Settings: &common.InteractiveSettings{
 					Interfaces:            map[string]map[string]*common.InteractiveInterface{},
 					Templates:             map[string]string{},
@@ -1707,11 +1740,9 @@ func TestInteractive(t *testing.T) {
 				},
 				Err: nil,
 			},
-			log,
-		),
-		&base.NoOpMetrics{},
-		log,
-	))
+		}),
+		Log: log,
+	}))
 	defer ts.Close()
 
 	problemAlias := "sumas"
@@ -1858,12 +1889,19 @@ func TestExampleCases(t *testing.T) {
 	}
 
 	log := base.StderrLog(false)
-	ts := httptest.NewServer(GitHandler(
-		tmpDir,
-		NewGitProtocol(authorize, nil, true, OverallWallTimeHardLimit, fakeInteractiveSettingsCompiler, log),
-		&base.NoOpMetrics{},
-		log,
-	))
+	ts := httptest.NewServer(NewGitHandler(GitHandlerOpts{
+		RootPath: tmpDir,
+		Protocol: NewGitProtocol(GitProtocolOpts{
+			GitProtocolOpts: githttp.GitProtocolOpts{
+				AuthCallback: authorize,
+				Log:          log,
+			},
+			AllowDirectPushToMaster:     true,
+			HardOverallWallTimeLimit:    OverallWallTimeHardLimit,
+			InteractiveSettingsCompiler: fakeInteractiveSettingsCompiler,
+		}),
+		Log: log,
+	}))
 	defer ts.Close()
 
 	problemAlias := "sumas"
@@ -2183,12 +2221,19 @@ func TestStatements(t *testing.T) {
 	}
 
 	log := base.StderrLog(false)
-	ts := httptest.NewServer(GitHandler(
-		tmpDir,
-		NewGitProtocol(authorize, nil, true, OverallWallTimeHardLimit, fakeInteractiveSettingsCompiler, log),
-		&base.NoOpMetrics{},
-		log,
-	))
+	ts := httptest.NewServer(NewGitHandler(GitHandlerOpts{
+		RootPath: tmpDir,
+		Protocol: NewGitProtocol(GitProtocolOpts{
+			GitProtocolOpts: githttp.GitProtocolOpts{
+				AuthCallback: authorize,
+				Log:          log,
+			},
+			AllowDirectPushToMaster:     true,
+			HardOverallWallTimeLimit:    OverallWallTimeHardLimit,
+			InteractiveSettingsCompiler: fakeInteractiveSettingsCompiler,
+		}),
+		Log: log,
+	}))
 	defer ts.Close()
 
 	problemAlias := "sumas"
@@ -2277,12 +2322,19 @@ func TestTests(t *testing.T) {
 	}
 
 	log := base.StderrLog(false)
-	ts := httptest.NewServer(GitHandler(
-		tmpDir,
-		NewGitProtocol(authorize, nil, true, OverallWallTimeHardLimit, fakeInteractiveSettingsCompiler, log),
-		&base.NoOpMetrics{},
-		log,
-	))
+	ts := httptest.NewServer(NewGitHandler(GitHandlerOpts{
+		RootPath: tmpDir,
+		Protocol: NewGitProtocol(GitProtocolOpts{
+			GitProtocolOpts: githttp.GitProtocolOpts{
+				AuthCallback: authorize,
+				Log:          log,
+			},
+			AllowDirectPushToMaster:     true,
+			HardOverallWallTimeLimit:    OverallWallTimeHardLimit,
+			InteractiveSettingsCompiler: fakeInteractiveSettingsCompiler,
+		}),
+		Log: log,
+	}))
 	defer ts.Close()
 
 	problemAlias := "sumas"
