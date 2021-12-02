@@ -3,6 +3,7 @@ package main
 import (
 	"archive/zip"
 	"bytes"
+	"context"
 	"io"
 	"io/ioutil"
 	"os"
@@ -20,6 +21,8 @@ import (
 )
 
 func getTreeOid(t *testing.T, extraFileContents map[string]io.Reader, log log15.Logger) *git.Oid {
+	t.Helper()
+	ctx := context.Background()
 	tmpdir, err := ioutil.TempDir("", "gitrepo")
 	if err != nil {
 		t.Fatalf("Failed to create tempdir: %v", err)
@@ -45,7 +48,7 @@ func getTreeOid(t *testing.T, extraFileContents map[string]io.Reader, log log15.
 		t.Fatalf("Failed to write zip: %v", err)
 	}
 
-	repo, err := gitserver.InitRepository(tmpdir)
+	repo, err := gitserver.InitRepository(ctx, tmpdir)
 	if err != nil {
 		t.Fatalf("Failed to initialize bare repository: %v", err)
 	}
@@ -202,8 +205,9 @@ func TestProblemUpdateZip(t *testing.T) {
 	if os.Getenv("PRESERVE") == "" {
 		defer os.RemoveAll(tmpdir)
 	}
+	ctx := context.Background()
 
-	repo, err := gitserver.InitRepository(tmpdir)
+	repo, err := gitserver.InitRepository(ctx, tmpdir)
 	if err != nil {
 		t.Fatalf("Failed to initialize bare repository: %v", err)
 	}
@@ -335,8 +339,9 @@ func TestProblemUpdateBlobs(t *testing.T) {
 	if os.Getenv("PRESERVE") == "" {
 		defer os.RemoveAll(tmpdir)
 	}
+	ctx := context.Background()
 
-	repo, err := gitserver.InitRepository(tmpdir)
+	repo, err := gitserver.InitRepository(ctx, tmpdir)
 	if err != nil {
 		t.Fatalf("Failed to initialize bare repository: %v", err)
 	}

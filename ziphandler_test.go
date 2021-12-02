@@ -2,6 +2,7 @@ package gitserver
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -235,10 +236,11 @@ func TestConvertZip(t *testing.T) {
 	if os.Getenv("PRESERVE") == "" {
 		defer os.RemoveAll(tmpDir)
 	}
+	ctx := context.Background()
 
 	problemAlias := "sumas"
 
-	repo, err := InitRepository(path.Join(tmpDir, problemAlias))
+	repo, err := InitRepository(ctx, path.Join(tmpDir, problemAlias))
 	if err != nil {
 		t.Fatalf("Failed to initialize git repository: %v", err)
 	}
@@ -259,6 +261,7 @@ func TestConvertZip(t *testing.T) {
 	commitMessage := "Initial commit"
 
 	zipOid, err := ConvertZipToPackfile(
+		ctx,
 		common.NewProblemFilesFromMap(
 			fileContents,
 			"problem.zip",
@@ -473,10 +476,11 @@ func TestZiphandlerStatements(t *testing.T) {
 	if os.Getenv("PRESERVE") == "" {
 		defer os.RemoveAll(tmpDir)
 	}
+	ctx := context.Background()
 
 	problemAlias := "sumas"
 
-	repo, err := InitRepository(path.Join(tmpDir, problemAlias))
+	repo, err := InitRepository(ctx, path.Join(tmpDir, problemAlias))
 	if err != nil {
 		t.Fatalf("Failed to initialize git repository: %v", err)
 	}
@@ -516,6 +520,7 @@ func TestZiphandlerStatements(t *testing.T) {
 			commitMessage := "Initial commit"
 
 			_, err = ConvertZipToPackfile(
+				ctx,
 				common.NewProblemFilesFromMap(
 					testcase.fileContents,
 					"problem.zip",
@@ -556,10 +561,11 @@ func TestTestplan(t *testing.T) {
 	if os.Getenv("PRESERVE") == "" {
 		defer os.RemoveAll(tmpDir)
 	}
+	ctx := context.Background()
 
 	problemAlias := "sumas"
 
-	repo, err := InitRepository(path.Join(tmpDir, problemAlias))
+	repo, err := InitRepository(ctx, path.Join(tmpDir, problemAlias))
 	if err != nil {
 		t.Fatalf("Failed to initialize git repository: %v", err)
 	}
@@ -587,6 +593,7 @@ func TestTestplan(t *testing.T) {
 		commitMessage := "Initial commit"
 
 		_, err = ConvertZipToPackfile(
+			ctx,
 			common.NewProblemFilesFromMap(
 				fileContents,
 				"problem.zip",

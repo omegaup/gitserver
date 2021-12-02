@@ -288,6 +288,7 @@ func TestInvalidRef(t *testing.T) {
 	if os.Getenv("PRESERVE") == "" {
 		defer os.RemoveAll(tmpDir)
 	}
+	ctx := context.Background()
 
 	log := base.StderrLog(false)
 	ts := httptest.NewServer(NewGitHandler(GitHandlerOpts{
@@ -307,7 +308,7 @@ func TestInvalidRef(t *testing.T) {
 	problemAlias := "sumas"
 
 	{
-		repo, err := InitRepository(path.Join(tmpDir, problemAlias))
+		repo, err := InitRepository(ctx, path.Join(tmpDir, problemAlias))
 		if err != nil {
 			t.Fatalf("Failed to initialize git repository: %v", err)
 		}
@@ -366,6 +367,7 @@ func TestDelete(t *testing.T) {
 	if os.Getenv("PRESERVE") == "" {
 		defer os.RemoveAll(tmpDir)
 	}
+	ctx := context.Background()
 
 	log := base.StderrLog(false)
 	ts := httptest.NewServer(NewGitHandler(GitHandlerOpts{
@@ -385,7 +387,7 @@ func TestDelete(t *testing.T) {
 	problemAlias := "sumas"
 
 	{
-		repo, err := InitRepository(path.Join(tmpDir, problemAlias))
+		repo, err := InitRepository(ctx, path.Join(tmpDir, problemAlias))
 		if err != nil {
 			t.Fatalf("Failed to initialize git repository: %v", err)
 		}
@@ -447,6 +449,7 @@ func TestServerCreateReview(t *testing.T) {
 	if os.Getenv("PRESERVE") == "" {
 		defer os.RemoveAll(tmpDir)
 	}
+	ctx := context.Background()
 
 	log := base.StderrLog(false)
 	ts := httptest.NewServer(NewGitHandler(GitHandlerOpts{
@@ -466,7 +469,7 @@ func TestServerCreateReview(t *testing.T) {
 	problemAlias := "sumas"
 
 	{
-		repo, err := InitRepository(path.Join(tmpDir, problemAlias))
+		repo, err := InitRepository(ctx, path.Join(tmpDir, problemAlias))
 		if err != nil {
 			t.Fatalf("Failed to initialize git repository: %v", err)
 		}
@@ -1242,6 +1245,7 @@ func TestPushGitbomb(t *testing.T) {
 	if os.Getenv("PRESERVE") == "" {
 		defer os.RemoveAll(tmpDir)
 	}
+	ctx := context.Background()
 
 	log := base.StderrLog(false)
 	ts := httptest.NewServer(NewGitHandler(GitHandlerOpts{
@@ -1261,7 +1265,7 @@ func TestPushGitbomb(t *testing.T) {
 	problemAlias := "sumas"
 
 	{
-		repo, err := InitRepository(path.Join(tmpDir, problemAlias))
+		repo, err := InitRepository(ctx, path.Join(tmpDir, problemAlias))
 		if err != nil {
 			t.Fatalf("Failed to initialize git repository: %v", err)
 		}
@@ -1365,6 +1369,7 @@ func TestConfig(t *testing.T) {
 	if os.Getenv("PRESERVE") == "" {
 		defer os.RemoveAll(tmpDir)
 	}
+	ctx := context.Background()
 
 	log := base.StderrLog(false)
 	ts := httptest.NewServer(NewGitHandler(GitHandlerOpts{
@@ -1384,7 +1389,7 @@ func TestConfig(t *testing.T) {
 	problemAlias := "sumas"
 
 	{
-		repo, err := InitRepository(path.Join(tmpDir, problemAlias))
+		repo, err := InitRepository(ctx, path.Join(tmpDir, problemAlias))
 		if err != nil {
 			t.Fatalf("Failed to initialize git repository: %v", err)
 		}
@@ -1718,6 +1723,7 @@ func TestInteractive(t *testing.T) {
 	if os.Getenv("PRESERVE") == "" {
 		defer os.RemoveAll(tmpDir)
 	}
+	ctx := context.Background()
 
 	log := base.StderrLog(false)
 	ts := httptest.NewServer(NewGitHandler(GitHandlerOpts{
@@ -1747,7 +1753,7 @@ func TestInteractive(t *testing.T) {
 
 	problemAlias := "sumas"
 
-	repo, err := InitRepository(path.Join(tmpDir, problemAlias))
+	repo, err := InitRepository(ctx, path.Join(tmpDir, problemAlias))
 	if err != nil {
 		t.Fatalf("Failed to initialize git repository: %v", err)
 	}
@@ -1837,6 +1843,7 @@ int main(int argc, char* argv[]) {
 	defer masterTree.Free()
 
 	problemSettings, err := getProblemSettings(
+		ctx,
 		repo,
 		masterTree,
 	)
@@ -1887,6 +1894,7 @@ func TestExampleCases(t *testing.T) {
 	if os.Getenv("PRESERVE") == "" {
 		defer os.RemoveAll(tmpDir)
 	}
+	ctx := context.Background()
 
 	log := base.StderrLog(false)
 	ts := httptest.NewServer(NewGitHandler(GitHandlerOpts{
@@ -1906,7 +1914,7 @@ func TestExampleCases(t *testing.T) {
 
 	problemAlias := "sumas"
 
-	repo, err := InitRepository(path.Join(tmpDir, problemAlias))
+	repo, err := InitRepository(ctx, path.Join(tmpDir, problemAlias))
 	if err != nil {
 		t.Fatalf("Failed to initialize git repository: %v", err)
 	}
@@ -2219,6 +2227,7 @@ func TestStatements(t *testing.T) {
 	if os.Getenv("PRESERVE") == "" {
 		defer os.RemoveAll(tmpDir)
 	}
+	ctx := context.Background()
 
 	log := base.StderrLog(false)
 	ts := httptest.NewServer(NewGitHandler(GitHandlerOpts{
@@ -2238,7 +2247,7 @@ func TestStatements(t *testing.T) {
 
 	problemAlias := "sumas"
 
-	repo, err := InitRepository(path.Join(tmpDir, problemAlias))
+	repo, err := InitRepository(ctx, path.Join(tmpDir, problemAlias))
 	if err != nil {
 		t.Fatalf("Failed to initialize git repository: %v", err)
 	}
@@ -2320,6 +2329,7 @@ func TestTests(t *testing.T) {
 	if os.Getenv("PRESERVE") == "" {
 		defer os.RemoveAll(tmpDir)
 	}
+	ctx := context.Background()
 
 	log := base.StderrLog(false)
 	ts := httptest.NewServer(NewGitHandler(GitHandlerOpts{
@@ -2339,7 +2349,7 @@ func TestTests(t *testing.T) {
 
 	problemAlias := "sumas"
 
-	repo, err := InitRepository(path.Join(tmpDir, problemAlias))
+	repo, err := InitRepository(ctx, path.Join(tmpDir, problemAlias))
 	if err != nil {
 		t.Fatalf("Failed to initialize git repository: %v", err)
 	}

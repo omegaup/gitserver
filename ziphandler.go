@@ -182,9 +182,11 @@ type UpdateResult struct {
 }
 
 func getAllFilesForCommit(
+	ctx context.Context,
 	repo *git.Repository,
 	commitID *git.Oid,
 ) (map[string]*git.Oid, error) {
+	defer tracing.FromContext(ctx).StartSegment("getAllFilesForCommit").End()
 	if commitID.IsZero() {
 		return map[string]*git.Oid{}, nil
 	}
@@ -240,9 +242,11 @@ func getAllFilesForCommit(
 
 // GetUpdatedFiles returns the files that were updated in the master branch.
 func GetUpdatedFiles(
+	ctx context.Context,
 	repo *git.Repository,
 	updatedRefs []githttp.UpdatedRef,
 ) ([]UpdatedFile, error) {
+	defer tracing.FromContext(ctx).StartSegment("GetUpdatedFiles").End()
 	var masterUpdatedRef *githttp.UpdatedRef
 	for _, updatedRef := range updatedRefs {
 		if updatedRef.Name != "refs/heads/master" {
@@ -283,7 +287,7 @@ func GetUpdatedFiles(
 		)
 	}
 
-	fromIDs, err := getAllFilesForCommit(repo, fromCommitID)
+	fromIDs, err := getAllFilesForCommit(ctx, repo, fromCommitID)
 	if err != nil {
 		return nil, base.ErrorWithCategory(
 			ErrInternalGit,
@@ -294,7 +298,7 @@ func GetUpdatedFiles(
 			),
 		)
 	}
-	toIDs, err := getAllFilesForCommit(repo, toCommitID)
+	toIDs, err := getAllFilesForCommit(ctx, repo, toCommitID)
 	if err != nil {
 		return nil, base.ErrorWithCategory(
 			ErrInternalGit,
@@ -355,6 +359,7 @@ func isValidProblemFile(filename string) bool {
 // specified contents plus a subset of the parent commit's tree, depending of
 // the value of zipMergeStrategy.
 func CreatePackfile(
+	ctx context.Context,
 	contents map[string]io.Reader,
 	settings *common.ProblemSettings,
 	zipMergeStrategy ZipMergeStrategy,
@@ -365,6 +370,7 @@ func CreatePackfile(
 	w io.Writer,
 	log log15.Logger,
 ) (*git.Oid, error) {
+	defer tracing.FromContext(ctx).StartSegment("CreatePackfile").End()
 	odb, err := repo.Odb()
 	if err != nil {
 		return nil, base.ErrorWithCategory(
@@ -866,10 +872,12 @@ func CreatePackfile(
 }
 
 func getUpdatedProblemSettings(
+	ctx context.Context,
 	problemSettings *common.ProblemSettings,
 	repo *git.Repository,
 	parent *git.Oid,
 ) (*common.ProblemSettings, error) {
+	defer tracing.FromContext(ctx).StartSegment("getUpdatedProblemSettings").End()
 	parentCommit, err := repo.LookupCommit(parent)
 	if err != nil {
 		return nil, base.ErrorWithCategory(
@@ -938,6 +946,7 @@ func getUpdatedProblemSettings(
 // ConvertZipToPackfile receives a .zip file from the caller and converts it
 // into a git packfile that can be used to update the repository.
 func ConvertZipToPackfile(
+	ctx context.Context,
 	problemFiles common.ProblemFiles,
 	settings *common.ProblemSettings,
 	zipMergeStrategy ZipMergeStrategy,
@@ -949,6 +958,7 @@ func ConvertZipToPackfile(
 	w io.Writer,
 	log log15.Logger,
 ) (*git.Oid, error) {
+	defer tracing.FromContext(ctx).StartSegment("ConvertZipToPackfile").End()
 	contents := make(map[string]io.Reader)
 
 	inCases := make(map[string]struct{})
@@ -1025,6 +1035,7 @@ func ConvertZipToPackfile(
 		if settings != nil {
 			var err error
 			if settings, err = getUpdatedProblemSettings(
+				ctx,
 				settings,
 				repo,
 				parent,
@@ -1034,6 +1045,7 @@ func ConvertZipToPackfile(
 		}
 
 		return CreatePackfile(
+			ctx,
 			contents,
 			settings,
 			zipMergeStrategy,
@@ -1091,6 +1103,7 @@ func ConvertZipToPackfile(
 	)
 
 	return CreatePackfile(
+		ctx,
 		contents,
 		settings,
 		zipMergeStrategy,
@@ -1122,6 +1135,7 @@ func PushZip(
 	protocol *githttp.GitProtocol,
 	log log15.Logger,
 ) (*UpdateResult, error) {
+	defer tracing.FromContext(ctx).StartSegment("PushZip").End()
 	oldOid := &git.Oid{}
 	var reference *git.Reference
 	if ok, _ := repo.IsHeadUnborn(); !ok {
@@ -1153,6 +1167,7 @@ func PushZip(
 	defer os.Remove(packfile.Name())
 
 	newOid, err := ConvertZipToPackfile(
+		ctx,
 		problemFiles,
 		problemSettings,
 		zipMergeStrategy,
@@ -1202,7 +1217,7 @@ func PushZip(
 		return nil, err
 	}
 
-	updatedFiles, err := GetUpdatedFiles(repo, updatedRefs)
+	updatedFiles, err := GetUpdatedFiles(ctx, repo, updatedRefs)
 	if err != nil {
 		return nil, errors.Wrap(
 			err,
@@ -1403,12 +1418,14 @@ func (h *zipUploadHandler) handleGitUploadZip(
 	}
 
 	var repo *git.Repository
+	openRepoSegment := txn.StartSegment("open repository")
 	commitCallback := func() error { return nil }
 	if requestContext.Request.Create {
 		dir, err := ioutil.TempDir(filepath.Dir(repositoryPath), "repository")
 		if err != nil {
 			h.log.Error("Failed to create temporary directory", "err", err)
 			w.WriteHeader(http.StatusInternalServerError)
+			openRepoSegment.End()
 			return
 		}
 		defer os.RemoveAll(dir)
@@ -1416,13 +1433,15 @@ func (h *zipUploadHandler) handleGitUploadZip(
 		if err := os.Chmod(dir, 0755); err != nil {
 			h.log.Error("Failed to chmod temporary directory", "err", err)
 			w.WriteHeader(http.StatusInternalServerError)
+			openRepoSegment.End()
 			return
 		}
 
-		repo, err = InitRepository(dir)
+		repo, err = InitRepository(ctx, dir)
 		if err != nil {
 			h.log.Error("failed to init repository", "err", err)
 			w.WriteHeader(http.StatusInternalServerError)
+			openRepoSegment.End()
 			return
 		}
 		commitCallback = func() error {
@@ -1433,9 +1452,11 @@ func (h *zipUploadHandler) handleGitUploadZip(
 		if err != nil {
 			h.log.Error("failed to open repository", "err", err)
 			w.WriteHeader(http.StatusInternalServerError)
+			openRepoSegment.End()
 			return
 		}
 	}
+	openRepoSegment.End()
 	defer repo.Free()
 
 	acquireLockSegment := txn.StartSegment("acquire lock")

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"errors"
 	"io"
 	"io/ioutil"
@@ -31,6 +32,8 @@ func TestHealth(t *testing.T) {
 	if os.Getenv("PRESERVE") == "" {
 		defer os.RemoveAll(tmpDir)
 	}
+
+	ctx := context.Background()
 
 	log := base.StderrLog(false)
 	ts := httptest.NewUnstartedServer(nil)
@@ -69,7 +72,7 @@ func TestHealth(t *testing.T) {
 
 	problemAlias := "sumas"
 
-	repo, err := gitserver.InitRepository(path.Join(tmpDir, problemAlias))
+	repo, err := gitserver.InitRepository(ctx, path.Join(tmpDir, problemAlias))
 	if err != nil {
 		t.Fatalf("Failed to initialize git repository: %v", err)
 	}

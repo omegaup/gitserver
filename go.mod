@@ -14,7 +14,7 @@ require (
 	github.com/mattn/go-sqlite3 v1.14.8
 	github.com/newrelic/go-agent/v3 v3.15.1
 	github.com/o1egl/paseto v1.0.0
-	github.com/omegaup/githttp/v2 v2.2.0
+	github.com/omegaup/githttp/v2 v2.2.1
 	github.com/omegaup/go-base/tracing/newrelic v0.0.0-20211201150123-3ace5d86e12a
 	github.com/omegaup/go-base/v2 v2.3.0
 	github.com/omegaup/quark v1.8.0

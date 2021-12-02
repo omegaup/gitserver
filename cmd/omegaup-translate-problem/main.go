@@ -453,6 +453,7 @@ func createPackfileFromMergedCommit(
 }
 
 func unmergeRepository(
+	ctx context.Context,
 	sourceRepositoryPath,
 	destRepositoryPath string,
 	ignoreCommitter bool,
@@ -468,7 +469,7 @@ func unmergeRepository(
 	}
 	defer sourceRepo.Free()
 
-	destRepo, err := gitserver.InitRepository(destRepositoryPath)
+	destRepo, err := gitserver.InitRepository(ctx, destRepositoryPath)
 	if err != nil {
 		return nil, errors.Wrapf(
 			err,
@@ -606,6 +607,7 @@ func main() {
 		os.Exit(1)
 	}
 
+	ctx := context.Background()
 	operation := args[0]
 	sourceRepositoryPath := args[1]
 	destRepositoryPath := args[2]
@@ -635,7 +637,7 @@ func main() {
 		}
 		defer f.Close()
 
-		report, err := unmergeRepository(sourceRepositoryPath, destRepositoryPath, *ignoreCommitter, log)
+		report, err := unmergeRepository(ctx, sourceRepositoryPath, destRepositoryPath, *ignoreCommitter, log)
 		if err != nil {
 			log.Crit(
 				"failed to unmerge repository",
