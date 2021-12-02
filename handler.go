@@ -21,6 +21,7 @@ import (
 	"github.com/omegaup/githttp/v2"
 	"github.com/omegaup/gitserver/request"
 	base "github.com/omegaup/go-base/v2"
+	tracing "github.com/omegaup/go-base/v2/tracing"
 	"github.com/omegaup/quark/common"
 
 	"github.com/inconshreveable/log15"
@@ -1736,6 +1737,7 @@ type GitHandlerOpts struct {
 	Protocol *githttp.GitProtocol
 	Metrics  base.Metrics
 	Log      log15.Logger
+	Tracing  tracing.Provider
 }
 
 // NewGitHandler is the HTTP handler for the omegaUp git server.
@@ -1751,7 +1753,8 @@ func NewGitHandler(opts GitHandlerOpts) http.Handler {
 		ContextCallback: func(ctx context.Context) context.Context {
 			return request.NewContext(ctx, opts.Metrics)
 		},
-		Log: opts.Log,
+		Log:     opts.Log,
+		Tracing: opts.Tracing,
 	})
 }
 

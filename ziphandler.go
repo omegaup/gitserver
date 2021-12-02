@@ -22,6 +22,7 @@ import (
 	"github.com/omegaup/githttp/v2"
 	"github.com/omegaup/gitserver/request"
 	base "github.com/omegaup/go-base/v2"
+	"github.com/omegaup/go-base/v2/tracing"
 	"github.com/omegaup/quark/common"
 
 	"github.com/inconshreveable/log15"
@@ -1265,6 +1266,7 @@ type zipUploadHandler struct {
 	protocol *githttp.GitProtocol
 	metrics  base.Metrics
 	log      log15.Logger
+	tracing  tracing.Provider
 }
 
 func (h *zipUploadHandler) handleGitUploadZip(
@@ -1272,6 +1274,7 @@ func (h *zipUploadHandler) handleGitUploadZip(
 	r *http.Request,
 	repositoryName string,
 ) {
+	txn := tracing.FromContext(r.Context())
 	if r.Method != "POST" {
 		w.WriteHeader(http.StatusMethodNotAllowed)
 		return
@@ -1435,17 +1438,23 @@ func (h *zipUploadHandler) handleGitUploadZip(
 	}
 	defer repo.Free()
 
+	acquireLockSegment := txn.StartSegment("acquire lock")
 	lockfile := githttp.NewLockfile(repo.Path())
 	if ok, err := lockfile.TryRLock(); !ok {
 		h.log.Info("Waiting for the lockfile", "err", err)
-		if err := lockfile.RLock(); err != nil {
+		err := lockfile.RLock()
+		acquireLockSegment.End()
+		if err != nil {
 			h.log.Crit("Failed to acquire the lockfile", "err", err)
 			w.WriteHeader(http.StatusInternalServerError)
 			return
 		}
+	} else {
+		acquireLockSegment.End()
 	}
 	defer lockfile.Unlock()
 
+	pushZipSegment := txn.StartSegment("push zip")
 	updateResult, err := PushZip(
 		ctx,
 		common.NewProblemFilesFromZip(
@@ -1464,6 +1473,7 @@ func (h *zipUploadHandler) handleGitUploadZip(
 		h.protocol,
 		h.log,
 	)
+	pushZipSegment.End()
 	if err != nil {
 		h.log.Error("push failed", "path", repositoryPath, "err", err)
 		cause := githttp.WriteHeader(w, err, false)
@@ -1579,6 +1589,7 @@ type ZipHandlerOpts struct {
 	Protocol *githttp.GitProtocol
 	Metrics  base.Metrics
 	Log      log15.Logger
+	Tracing  tracing.Provider
 }
 
 // NewZipHandler is the HTTP handler that allows uploading .zip files.
@@ -1589,10 +1600,14 @@ func NewZipHandler(opts ZipHandlerOpts) http.Handler {
 	if opts.Log == nil {
 		opts.Log = log15.New()
 	}
+	if opts.Tracing == nil {
+		opts.Tracing = tracing.NewNoOpProvider()
+	}
 	return &zipUploadHandler{
 		rootPath: opts.RootPath,
 		protocol: opts.Protocol,
 		metrics:  opts.Metrics,
 		log:      opts.Log,
+		tracing:  opts.Tracing,
 	}
 }

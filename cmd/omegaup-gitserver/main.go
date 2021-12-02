@@ -17,11 +17,13 @@ import (
 	"github.com/omegaup/githttp/v2"
 	"github.com/omegaup/gitserver"
 	"github.com/omegaup/gitserver/request"
+	nrtracing "github.com/omegaup/go-base/tracing/newrelic"
 	base "github.com/omegaup/go-base/v2"
+	"github.com/omegaup/go-base/v2/tracing"
 
 	"github.com/coreos/go-systemd/v22/daemon"
 	"github.com/inconshreveable/log15"
-	"github.com/newrelic/go-agent/v3/newrelic"
+	newrelic "github.com/newrelic/go-agent/v3/newrelic"
 )
 
 var (
@@ -83,20 +85,23 @@ func muxHandler(
 	log log15.Logger,
 ) http.Handler {
 	metrics, metricsHandler := gitserver.SetupMetrics(ProgramVersion)
-	_, wrappedGitHandler := newrelic.WrapHandle(app, "/", gitserver.NewGitHandler(gitserver.GitHandlerOpts{
+	tracing := nrtracing.New(app)
+	_, wrappedGitHandler := tracing.WrapHandle("/", gitserver.NewGitHandler(gitserver.GitHandlerOpts{
 		RootPath: rootPath,
 		Protocol: protocol,
 		Metrics:  metrics,
 		Log:      log,
+		Tracing:  tracing,
 	}))
-	_, wrappedZipHandler := newrelic.WrapHandle(app, "/", gitserver.NewZipHandler(gitserver.ZipHandlerOpts{
+	_, wrappedZipHandler := tracing.WrapHandle("/", gitserver.NewZipHandler(gitserver.ZipHandlerOpts{
 		RootPath: rootPath,
 		Protocol: protocol,
 		Metrics:  metrics,
 		Log:      log,
+		Tracing:  tracing,
 	}))
-	_, wrappedHealthHandler := newrelic.WrapHandle(app, "/health", gitserver.HealthHandler(port))
-	_, wrappedMetricsHandler := newrelic.WrapHandle(app, "/metrics", metricsHandler)
+	_, wrappedHealthHandler := tracing.WrapHandle("/health", gitserver.HealthHandler(port))
+	_, wrappedMetricsHandler := tracing.WrapHandle("/metrics", metricsHandler)
 	return &muxGitHandler{
 		log:            log,
 		gitHandler:     wrappedGitHandler,
@@ -114,7 +119,7 @@ func (h *muxGitHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		h.metricsHandler.ServeHTTP(w, r)
 	} else if len(splitPath) == 2 && splitPath[1] == "git-upload-zip" ||
 		len(splitPath) == 3 && splitPath[1] == "rename-repository" {
-		txn := newrelic.FromContext(r.Context())
+		txn := tracing.FromContext(r.Context())
 		txn.SetName(r.Method + " /:repo/" + splitPath[1])
 		h.zipHandler.ServeHTTP(w, r)
 	} else {
