@@ -100,3 +100,20 @@ jobs:
           container_name=omegaup/gitserver:${{ steps.bump-version.outputs.tag }}
           docker tag omegaup/gitserver "${container_name}"
           docker push "${container_name}"
+
+      - name: Update k8s sandbox manifests
+        run: |
+          curl -s "https://raw.githubusercontent.com/kubernetes-sigs/kustomize/master/hack/install_kustomize.sh" | bash
+          sudo mv kustomize /usr/local/bin/
+
+          git clone --depth=1 https://omegaup-bot:${{ secrets.OMEGAUPBOT_RELEASE_TOKEN }}@github.com/omegaup/prod /tmp/prod
+          TAG="${{ steps.bump-version.outputs.tag }}"
+          (cd /tmp/prod/k8s/omegaup/overlays/sandbox/backend &&
+           git config --local user.name "omegaup-bot" && \
+           git config --local user.email "omegaup-bot@users.noreply.github.com" && \
+           kustomize edit set image \
+             "omegaup/gitserver:${TAG}"
+           sed -i "s/app.kubernetes.io\/version: .*/app.kubernetes.io\/version: ${TAG}/" gitserver-deployment.yaml &&
+           git commit -am "gitserver sandbox release ${TAG}" &&
+           git push)
+          rm -rf /tmp/prod
