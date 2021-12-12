@@ -11,10 +11,11 @@ import (
 	"os"
 	"time"
 
-	"github.com/inconshreveable/log15"
-	git "github.com/libgit2/git2go/v33"
 	"github.com/omegaup/githttp/v2"
-	base "github.com/omegaup/go-base/v2"
+	"github.com/omegaup/go-base/logging/log15"
+	"github.com/omegaup/go-base/v3/logging"
+
+	git "github.com/libgit2/git2go/v33"
 	"golang.org/x/crypto/ssh"
 )
 
@@ -25,7 +26,7 @@ var (
 	remoteBranch      = flag.String("branch", "master", "Target branch")
 	commitHash        = flag.String("commit", "", "Commit to push")
 	sshPrivateKeyPath = flag.String("ssh-key", "omegaup-bot.key", "Private SSH key")
-	log               log15.Logger
+	log               logging.Logger
 )
 
 func readPrivateKey(path string) (ssh.Signer, error) {
@@ -107,10 +108,20 @@ func forcePushToBranch(remote *url.URL) error {
 		pw := githttp.NewPktLineWriter(stdin)
 		discovery, err := githttp.DiscoverReferences(stdout)
 		if err != nil {
-			log.Error("Error discovering references", "err", err)
+			log.Error(
+				"Error discovering references",
+				map[string]interface{}{
+					"err": err,
+				},
+			)
 			return
 		}
-		log.Debug("Remote", "discovery", discovery)
+		log.Debug(
+			"Remote",
+			map[string]interface{}{
+				"discovery": discovery,
+			},
+		)
 		refName := fmt.Sprintf("refs/heads/%s", *remoteBranch)
 		var oldOid git.Oid
 		if oid, ok := discovery.References[refName]; ok {
@@ -123,7 +134,12 @@ func forcePushToBranch(remote *url.URL) error {
 				// Not found is normal. We're doing a force-push anyways.
 				descendant = false
 			} else {
-				log.Error("Error getting descendantness", "err", err)
+				log.Error(
+					"Error getting descendantness",
+					map[string]interface{}{
+						"err": err,
+					},
+				)
 				pw.Flush()
 				return
 			}
@@ -135,13 +151,30 @@ func forcePushToBranch(remote *url.URL) error {
 			newOid.String(),
 			refName,
 		)
-		log.Debug("Pushing", "oldOid", oldOid.String(), "newOid", newOid.String(), "line", line)
+		log.Debug(
+			"Pushing",
+			map[string]interface{}{
+				"oldOid": oldOid.String(),
+				"newOid": newOid.String(),
+				"line":   line,
+			},
+		)
 		if err := pw.WritePktLine([]byte(line)); err != nil {
-			log.Error("Error sending pktline", "err", err)
+			log.Error(
+				"Error sending pktline",
+				map[string]interface{}{
+					"err": err,
+				},
+			)
 			return
 		}
 		if err := pw.Flush(); err != nil {
-			log.Error("Error flushing", "err", err)
+			log.Error(
+				"Error flushing",
+				map[string]interface{}{
+					"err": err,
+				},
+			)
 			return
 		}
 
@@ -154,16 +187,31 @@ func forcePushToBranch(remote *url.URL) error {
 				if *current.Id() == oldOid {
 					break
 				}
-				log.Debug("Inserting commit", "commit", current.Id())
+				log.Debug(
+					"Inserting commit",
+					map[string]interface{}{
+						"commit": current.Id(),
+					},
+				)
 				if err := pb.InsertCommit(current.Id()); err != nil {
-					log.Error("Error building pack", "err", err)
+					log.Error(
+						"Error building pack",
+						map[string]interface{}{
+							"err": err,
+						},
+					)
 					break
 				}
 			}
 		}
 
 		if err := pb.Write(stdin); err != nil {
-			log.Error("Error writing pack", "err", err)
+			log.Error(
+				"Error writing pack",
+				map[string]interface{}{
+					"err": err,
+				},
+			)
 		}
 
 		pr := githttp.NewPktLineReader(stdout)
@@ -172,15 +220,30 @@ func forcePushToBranch(remote *url.URL) error {
 			if err == githttp.ErrFlush {
 				break
 			} else if err != nil {
-				log.Error("Error reading remote response", "err", err)
+				log.Error(
+					"Error reading remote response",
+					map[string]interface{}{
+						"err": err,
+					},
+				)
 				break
 			}
-			log.Debug("Line", "line", string(line))
+			log.Debug(
+				"Line",
+				map[string]interface{}{
+					"line": string(line),
+				},
+			)
 		}
 	}()
 
 	cmd := fmt.Sprintf("git-receive-pack '%s'", remote.Path)
-	log.Info("Sending command", "command", cmd)
+	log.Info(
+		"Sending command",
+		map[string]interface{}{
+			"command": cmd,
+		},
+	)
 	return session.Run(cmd)
 }
 
@@ -201,7 +264,12 @@ func pushToSubdirectory(remote *url.URL) error {
 	defer odb.Free()
 	tmpDir, err := ioutil.TempDir("", "packfile")
 	if err != nil {
-		log.Error("Could not create temporary directory for packfile", "err", err)
+		log.Error(
+			"Could not create temporary directory for packfile",
+			map[string]interface{}{
+				"err": err,
+			},
+		)
 		return err
 	}
 	defer os.RemoveAll(tmpDir)
@@ -266,24 +334,54 @@ func pushToSubdirectory(remote *url.URL) error {
 		pw := githttp.NewPktLineWriter(stdin)
 		discovery, err := githttp.DiscoverReferences(stdout)
 		if err != nil {
-			log.Error("Error discovering references", "err", err)
+			log.Error(
+				"Error discovering references",
+				map[string]interface{}{
+					"err": err,
+				},
+			)
 			return
 		}
-		log.Debug("Remote", "discovery", discovery)
+		log.Debug(
+			"Remote",
+			map[string]interface{}{
+				"discovery": discovery,
+			},
+		)
 		refName := fmt.Sprintf("refs/heads/%s", *remoteBranch)
 		if oid, ok := discovery.References[refName]; ok {
 			line := fmt.Sprintf("want %s\x00agent=gohttp ofs-delta shallow\n", oid.String())
-			log.Debug("Pulling", "line", line)
+			log.Debug(
+				"Pulling",
+				map[string]interface{}{
+					"line": line,
+				},
+			)
 			if err := pw.WritePktLine([]byte(line)); err != nil {
-				log.Error("Error sending pktline", "err", err)
+				log.Error(
+					"Error sending pktline",
+					map[string]interface{}{
+						"err": err,
+					},
+				)
 				return
 			}
 			if err := pw.WritePktLine([]byte("deepen 1")); err != nil {
-				log.Error("Error sending pktline", "err", err)
+				log.Error(
+					"Error sending pktline",
+					map[string]interface{}{
+						"err": err,
+					},
+				)
 				return
 			}
 			if err := pw.Flush(); err != nil {
-				log.Error("Error flushing", "err", err)
+				log.Error(
+					"Error flushing",
+					map[string]interface{}{
+						"err": err,
+					},
+				)
 				return
 			}
 		}
@@ -294,58 +392,97 @@ func pushToSubdirectory(remote *url.URL) error {
 			if err == githttp.ErrFlush {
 				break
 			} else if err != nil {
-				log.Error("Error reading shallow negotiation", "err", err)
+				log.Error(
+					"Error reading shallow negotiation",
+					map[string]interface{}{
+						"err": err,
+					},
+				)
 				break
 			}
-			log.Debug("Line", "line", string(line))
+			log.Debug(
+				"Line",
+				map[string]interface{}{
+					"line": string(line),
+				},
+			)
 		}
 
 		if err := pw.WritePktLine([]byte("done\n")); err != nil {
-			log.Error("Error sending pktline", "err", err)
+			log.Error(
+				"Error sending pktline",
+				map[string]interface{}{
+					"err": err,
+				},
+			)
 			return
 		}
 		stdin.Close()
 
 		line, err := pr.ReadPktLine()
 		if err != nil {
-			log.Error("Error reading ACK/NAK response", "err", err)
+			log.Error(
+				"Error reading ACK/NAK response",
+				map[string]interface{}{
+					"err": err,
+				},
+			)
 			return
 		}
 		if string(line) != "NAK\n" {
-			log.Error("Server did not reply with NAK")
+			log.Error("Server did not reply with NAK", nil)
 			return
 		}
 
-		log.Debug("Reading packfile")
+		log.Debug("Reading packfile", nil)
 
 		_, packPath, err := githttp.UnpackPackfile(odb, stdout, tmpDir, nil)
 		if err != nil {
-			log.Error("Error reading packfile", "err", err)
+			log.Error(
+				"Error reading packfile",
+				map[string]interface{}{
+					"err": err,
+				},
+			)
 			return
 		}
 
-		log.Info("Wrote packfile", "packPath", packPath)
+		log.Info(
+			"Wrote packfile",
+			map[string]interface{}{
+				"packPath": packPath,
+			},
+		)
 	}()
 
 	cmd := fmt.Sprintf("git-upload-pack '%s'", remote.Path)
-	log.Info("Sending command", "command", cmd)
+	log.Info(
+		"Sending command",
+		map[string]interface{}{
+			"command": cmd,
+		},
+	)
 	if err := session.Run(cmd); err != nil {
 		<-done
 		<-done
 		return err
 	}
 
-	log.Info("Command finished running, waiting for packfile processing")
+	log.Info("Command finished running, waiting for packfile processing", nil)
 	<-done
 	<-done
-	log.Info("All done!")
+	log.Info("All done!", nil)
 
 	return nil
 }
 
 func main() {
 	flag.Parse()
-	log = base.StderrLog(false)
+	var err error
+	log, err = log15.New("info", false)
+	if err != nil {
+		panic(err)
+	}
 
 	if *commitHash == "" {
 		panic(errors.New("Must provide a -commit flag"))

@@ -11,16 +11,17 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/inconshreveable/log15"
-	git "github.com/libgit2/git2go/v33"
 	"github.com/omegaup/githttp/v2"
 	"github.com/omegaup/gitserver"
 	"github.com/omegaup/gitserver/gitservertest"
-	base "github.com/omegaup/go-base/v2"
+	"github.com/omegaup/go-base/logging/log15"
+	"github.com/omegaup/go-base/v3/logging"
 	"github.com/omegaup/quark/common"
+
+	git "github.com/libgit2/git2go/v33"
 )
 
-func getTreeOid(t *testing.T, extraFileContents map[string]io.Reader, log log15.Logger) *git.Oid {
+func getTreeOid(t *testing.T, extraFileContents map[string]io.Reader, log logging.Logger) *git.Oid {
 	t.Helper()
 	ctx := context.Background()
 	tmpdir, err := ioutil.TempDir("", "gitrepo")
@@ -86,13 +87,21 @@ func getTreeOid(t *testing.T, extraFileContents map[string]io.Reader, log log15.
 	}
 	defer commit.Free()
 
-	log.Info("Commit", "parents", commit.ParentCount())
+	log.Info(
+		"Commit",
+		map[string]interface{}{
+			"parents": commit.ParentCount(),
+		},
+	)
 
 	return commit.TreeId()
 }
 
 func TestIdenticalTrees(t *testing.T) {
-	log := base.StderrLog(false)
+	log, err := log15.New("info", false)
+	if err != nil {
+		t.Fatalf("Failed to create log: %v", err)
+	}
 
 	defaultSettingsTree := getTreeOid(t, map[string]io.Reader{}, log)
 
@@ -196,7 +205,10 @@ func validateReferences(
 }
 
 func TestProblemUpdateZip(t *testing.T) {
-	log := base.StderrLog(false)
+	log, err := log15.New("info", false)
+	if err != nil {
+		t.Fatalf("Failed to create log: %v", err)
+	}
 
 	tmpdir, err := ioutil.TempDir("", "gitrepo")
 	if err != nil {
@@ -330,7 +342,10 @@ func TestProblemUpdateZip(t *testing.T) {
 }
 
 func TestProblemUpdateBlobs(t *testing.T) {
-	log := base.StderrLog(false)
+	log, err := log15.New("info", false)
+	if err != nil {
+		t.Fatalf("Failed to create log: %v", err)
+	}
 
 	tmpdir, err := ioutil.TempDir("", "gitrepo")
 	if err != nil {

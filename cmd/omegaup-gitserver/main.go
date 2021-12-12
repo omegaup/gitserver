@@ -13,16 +13,16 @@ import (
 	"syscall"
 	"time"
 
-	git "github.com/libgit2/git2go/v33"
 	"github.com/omegaup/githttp/v2"
 	"github.com/omegaup/gitserver"
 	"github.com/omegaup/gitserver/request"
+	"github.com/omegaup/go-base/logging/log15"
 	nrtracing "github.com/omegaup/go-base/tracing/newrelic"
-	base "github.com/omegaup/go-base/v2"
-	"github.com/omegaup/go-base/v2/tracing"
+	"github.com/omegaup/go-base/v3/logging"
+	"github.com/omegaup/go-base/v3/tracing"
 
 	"github.com/coreos/go-systemd/v22/daemon"
-	"github.com/inconshreveable/log15"
+	git "github.com/libgit2/git2go/v33"
 	newrelic "github.com/newrelic/go-agent/v3/newrelic"
 )
 
@@ -38,7 +38,6 @@ var (
 		"grant all privileges to all users",
 	)
 	version = flag.Bool("version", false, "Print the version and exit")
-	log     log15.Logger
 
 	// ProgramVersion is the version of the code from which the binary was built from.
 	ProgramVersion string
@@ -70,7 +69,7 @@ func referenceDiscovery(
 }
 
 type muxGitHandler struct {
-	log            log15.Logger
+	log            logging.Logger
 	gitHandler     http.Handler
 	zipHandler     http.Handler
 	metricsHandler http.Handler
@@ -82,7 +81,7 @@ func muxHandler(
 	port uint16,
 	rootPath string,
 	protocol *githttp.GitProtocol,
-	log log15.Logger,
+	log logging.Logger,
 ) http.Handler {
 	metrics, metricsHandler := gitserver.SetupMetrics(ProgramVersion)
 	tracing := nrtracing.New(app)
@@ -127,30 +126,6 @@ func (h *muxGitHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-type log15Logger struct {
-	log log15.Logger
-}
-
-func (l *log15Logger) Error(msg string, context map[string]interface{}) {
-	l.log.Error(msg, log15.Ctx(context))
-}
-
-func (l *log15Logger) Warn(msg string, context map[string]interface{}) {
-	l.log.Warn(msg, log15.Ctx(context))
-}
-
-func (l *log15Logger) Info(msg string, context map[string]interface{}) {
-	l.log.Info(msg, log15.Ctx(context))
-}
-
-func (l *log15Logger) Debug(msg string, context map[string]interface{}) {
-	l.log.Debug(msg, log15.Ctx(context))
-}
-
-func (l *log15Logger) DebugEnabled() bool {
-	return true
-}
-
 func main() {
 	defer git.Shutdown()
 
@@ -171,24 +146,9 @@ func main() {
 	}
 	f.Close()
 
-	if config.Logging.File != "" {
-		var err error
-		log, err = base.RotatingLog(
-			config.Logging.File,
-			config.Logging.Level,
-			config.Logging.JSON,
-		)
-		if err != nil {
-			panic(err)
-		}
-	} else if config.Logging.Level == "debug" {
-		log = base.StderrLog(config.Logging.JSON)
-	} else {
-		log = log15.New()
-		log.SetHandler(base.ErrorCallerStackHandler(
-			log15.LvlInfo,
-			base.StderrHandler(config.Logging.JSON),
-		))
+	log, err := log15.New(config.Logging.Level, config.Logging.JSON)
+	if err != nil {
+		panic(err)
 	}
 
 	var app *newrelic.Application
@@ -196,7 +156,7 @@ func main() {
 		app, err = newrelic.NewApplication(
 			newrelic.ConfigAppName(config.NewRelic.AppName),
 			newrelic.ConfigLicense(config.NewRelic.License),
-			newrelic.ConfigLogger(&log15Logger{log: log}),
+			newrelic.ConfigLogger(log),
 			newrelic.ConfigDistributedTracerEnabled(true),
 		)
 		if err != nil {
@@ -205,7 +165,7 @@ func main() {
 	}
 
 	if config.Gitserver.RootPath == "" {
-		log.Error("root path cannot be empty. Please specify one with -root")
+		log.Error("root path cannot be empty. Please specify one with -root", nil)
 		os.Exit(1)
 	}
 
@@ -214,7 +174,12 @@ func main() {
 
 	authCallback, err := createAuthorizationCallback(config, log)
 	if err != nil {
-		log.Error("failed to create the authorization callback", "err", err)
+		log.Error(
+			"failed to create the authorization callback",
+			map[string]interface{}{
+				"err": err,
+			},
+		)
 		os.Exit(1)
 	}
 
@@ -249,13 +214,20 @@ func main() {
 	go func() {
 		defer wg.Done()
 		if err := gitServer.ListenAndServe(); err != http.ErrServerClosed {
-			log.Error("gitServer ListenAndServe", "err", err)
+			log.Error(
+				"gitServer ListenAndServe",
+				map[string]interface{}{
+					"err": err,
+				},
+			)
 		}
 	}()
 	log.Info(
 		"omegaUp gitserver ready",
-		"version", ProgramVersion,
-		"address", gitServer.Addr,
+		map[string]interface{}{
+			"version": ProgramVersion,
+			"address": gitServer.Addr,
+		},
 	)
 
 	if config.Gitserver.PprofPort > 0 {
@@ -274,12 +246,19 @@ func main() {
 		go func() {
 			defer wg.Done()
 			if err := pprofServer.ListenAndServe(); err != http.ErrServerClosed {
-				log.Error("pprof ListenAndServe", "err", err)
+				log.Error(
+					"pprof ListenAndServe",
+					map[string]interface{}{
+						"err": err,
+					},
+				)
 			}
 		}()
 		log.Info(
 			"pprof server ready",
-			"address", pprofServer.Addr,
+			map[string]interface{}{
+				"address": pprofServer.Addr,
+			},
 		)
 	}
 	daemon.SdNotify(false, "READY=1")
@@ -287,7 +266,7 @@ func main() {
 	<-stopChan
 
 	daemon.SdNotify(false, "STOPPING=1")
-	log.Info("Shutting down server...")
+	log.Info("Shutting down server...", nil)
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	for _, server := range servers {
 		server.Shutdown(ctx)
@@ -296,5 +275,5 @@ func main() {
 	cancel()
 	wg.Wait()
 
-	log.Info("Server gracefully stopped.")
+	log.Info("Server gracefully stopped.", nil)
 }

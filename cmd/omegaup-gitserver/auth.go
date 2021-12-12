@@ -16,9 +16,9 @@ import (
 
 	"github.com/omegaup/githttp/v2"
 	"github.com/omegaup/gitserver/request"
+	"github.com/omegaup/go-base/v3/logging"
 
 	_ "github.com/go-sql-driver/mysql"
-	"github.com/inconshreveable/log15"
 	_ "github.com/mattn/go-sqlite3"
 	"github.com/newrelic/go-agent/v3/newrelic"
 	"github.com/o1egl/paseto"
@@ -41,7 +41,7 @@ const (
 )
 
 type omegaupAuthorization struct {
-	log       log15.Logger
+	log       logging.Logger
 	db        *sql.DB
 	publicKey ed25519.PublicKey
 
@@ -96,12 +96,22 @@ func (a *omegaupAuthorization) parseBearerToken(token string) (username, problem
 	var jsonToken paseto.JSONToken
 	var footer string
 	if err := paseto.NewV2().Verify(token, a.publicKey, &jsonToken, &footer); err != nil {
-		a.log.Error("failed to verify token", "err", err)
+		a.log.Error(
+			"failed to verify token",
+			map[string]interface{}{
+				"err": err,
+			},
+		)
 		return
 	}
 
 	if err := jsonToken.Validate(paseto.IssuedBy("omegaUp frontend"), paseto.ValidAt(time.Now())); err != nil {
-		a.log.Error("failed to validate token", "err", err)
+		a.log.Error(
+			"failed to validate token",
+			map[string]interface{}{
+				"err": err,
+			},
+		)
 		return
 	}
 
@@ -134,7 +144,12 @@ func (a *omegaupAuthorization) parseUsernameAndPassword(
 
 	if username == "omegaup:system" {
 		// omegaup:system can only log in using the auth token or the secret token.
-		a.log.Error("user tried to login with restricted user", "username", username)
+		a.log.Error(
+			"user tried to login with restricted user",
+			map[string]interface{}{
+				"username": username,
+			},
+		)
 		return
 	}
 
@@ -153,18 +168,35 @@ func (a *omegaupAuthorization) parseUsernameAndPassword(
 		&gitToken,
 	)
 	if err != nil {
-		a.log.Error("failed to query user", "username", username, "err", err)
+		a.log.Error(
+			"failed to query user",
+			map[string]interface{}{
+				"username": username,
+				"err":      err,
+			},
+		)
 		return
 	}
 
 	if !gitToken.Valid {
-		a.log.Error("user is missing a git token", "username", username)
+		a.log.Error(
+			"user is missing a git token",
+			map[string]interface{}{
+				"username": username,
+			},
+		)
 		return
 	}
 
 	ok, err = verifyArgon2idHash(password, gitToken.String)
 	if err != nil {
-		a.log.Error("failed to verify user's git token", "username", username, "err", err)
+		a.log.Error(
+			"failed to verify user's git token",
+			map[string]interface{}{
+				"username": username,
+				"err":      err,
+			},
+		)
 		return
 	}
 
@@ -172,7 +204,12 @@ func (a *omegaupAuthorization) parseUsernameAndPassword(
 		username = basicAuthUsername
 		problem = repositoryName
 	} else {
-		a.log.Error("user provided the wrong git token", "username", username)
+		a.log.Error(
+			"user provided the wrong git token",
+			map[string]interface{}{
+				"username": username,
+			},
+		)
 	}
 	return
 }
@@ -295,9 +332,11 @@ func (a *omegaupAuthorization) authorize(
 		ok = false
 		a.log.Error(
 			"Mismatched Basic authentication username",
-			"username", username,
-			"basic auth username", basicAuthUsername,
-			"repository", repositoryName,
+			map[string]interface{}{
+				"username":            username,
+				"basic auth username": basicAuthUsername,
+				"repository":          repositoryName,
+			},
 		)
 	}
 	if !ok {
@@ -321,8 +360,10 @@ func (a *omegaupAuthorization) authorize(
 		w.WriteHeader(http.StatusUnauthorized)
 		a.log.Error(
 			"Missing authentication",
-			"username", username,
-			"repository", repositoryName,
+			map[string]interface{}{
+				"username":   username,
+				"repository": repositoryName,
+			},
 		)
 		return githttp.AuthorizationDenied, ""
 	}
@@ -331,9 +372,11 @@ func (a *omegaupAuthorization) authorize(
 		w.WriteHeader(http.StatusForbidden)
 		a.log.Error(
 			"Mismatched problem name",
-			"username", username,
-			"repository", repositoryName,
-			"problem", problem,
+			map[string]interface{}{
+				"username":   username,
+				"repository": repositoryName,
+				"problem":    problem,
+			},
 		)
 		return githttp.AuthorizationDenied, ""
 	}
@@ -364,10 +407,12 @@ func (a *omegaupAuthorization) authorize(
 		if err != nil {
 			a.log.Error(
 				"Auth",
-				"username", username,
-				"repository", repositoryName,
-				"operation", operation,
-				"err", err,
+				map[string]interface{}{
+					"username":   username,
+					"repository": repositoryName,
+					"operation":  operation,
+					"err":        err,
+				},
 			)
 			return githttp.AuthorizationDenied, username
 		}
@@ -378,21 +423,23 @@ func (a *omegaupAuthorization) authorize(
 	}
 	a.log.Info(
 		"Auth",
-		"username", username,
-		"repository", repositoryName,
-		"operation", operation,
+		map[string]interface{}{
+			"username":   username,
+			"repository": repositoryName,
+			"operation":  operation,
+		},
 	)
 	return githttp.AuthorizationAllowed, username
 }
 
-func createAuthorizationCallback(config *Config, log log15.Logger) (githttp.AuthorizationCallback, error) {
+func createAuthorizationCallback(config *Config, log logging.Logger) (githttp.AuthorizationCallback, error) {
 	auth := omegaupAuthorization{
 		log:    log,
 		config: config,
 	}
 
 	if config.Gitserver.AllowSecretTokenAuthentication {
-		log.Warn("using insecure secret token authorization")
+		log.Warn("using insecure secret token authorization", nil)
 	}
 	if config.Gitserver.PublicKey != "" {
 		keyBytes, err := base64.StdEncoding.DecodeString(config.Gitserver.PublicKey)

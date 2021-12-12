@@ -20,11 +20,11 @@ import (
 
 	"github.com/omegaup/githttp/v2"
 	"github.com/omegaup/gitserver/request"
-	base "github.com/omegaup/go-base/v2"
-	tracing "github.com/omegaup/go-base/v2/tracing"
+	base "github.com/omegaup/go-base/v3"
+	"github.com/omegaup/go-base/v3/logging"
+	"github.com/omegaup/go-base/v3/tracing"
 	"github.com/omegaup/quark/common"
 
-	"github.com/inconshreveable/log15"
 	git "github.com/libgit2/git2go/v33"
 	"github.com/pkg/errors"
 )
@@ -208,7 +208,7 @@ type gitProtocol struct {
 	allowDirectPushToMaster     bool
 	hardOverallWallTimeLimit    base.Duration
 	interactiveSettingsCompiler InteractiveSettingsCompiler
-	log                         log15.Logger
+	log                         logging.Logger
 }
 
 // GitProtocolOpts contains all the possible options to initialize the git protocol.
@@ -223,9 +223,6 @@ type GitProtocolOpts struct {
 // NewGitProtocol creates a new GitProtocol with the provided authorization
 // callback.
 func NewGitProtocol(opts GitProtocolOpts) *githttp.GitProtocol {
-	if opts.Log == nil {
-		opts.Log = log15.New()
-	}
 	protocol := &gitProtocol{
 		allowDirectPushToMaster:     opts.AllowDirectPushToMaster,
 		hardOverallWallTimeLimit:    opts.HardOverallWallTimeLimit,
@@ -519,7 +516,7 @@ func validateUpdateMaster(
 	allowDirectPush bool,
 	hardOverallWallTimeLimit base.Duration,
 	interactiveSettingsCompiler InteractiveSettingsCompiler,
-	log log15.Logger,
+	log logging.Logger,
 ) error {
 	defer tracing.FromContext(ctx).StartSegment("validateUpdateMaster").End()
 	it, err := repo.NewReferenceIteratorGlob("refs/changes/*")
@@ -1440,9 +1437,7 @@ func (p *gitProtocol) validateChange(
 	err = newTree.Walk(func(name string, entry *git.TreeEntry) error {
 		objectCount++
 		if objectCount > objectLimit {
-			p.log.Error(
-				"Tree exceeded object limit",
-			)
+			p.log.Error("Tree exceeded object limit", nil)
 			return ErrTooManyObjects
 		}
 		return nil
@@ -1497,14 +1492,18 @@ func (p *gitProtocol) validateUpdate(
 
 	p.log.Info(
 		"Update",
-		"command", command,
-		"request", requestContext.Request,
+		map[string]interface{}{
+			"command": command,
+			"request": requestContext.Request,
+		},
 	)
 	if command.IsDelete() {
 		p.log.Error(
 			"deleting references is disallowed",
-			"ref", command.ReferenceName,
-			"request", requestContext.Request,
+			map[string]interface{}{
+				"ref":     command.ReferenceName,
+				"request": requestContext.Request,
+			},
 		)
 		return githttp.ErrDeleteDisallowed
 	}
@@ -1515,8 +1514,10 @@ func (p *gitProtocol) validateUpdate(
 		!githttp.ValidateFastForward(repo, newCommit, command.Reference) {
 		p.log.Error(
 			"non-fast-forward is not allowed for this branch",
-			"ref", command.ReferenceName,
-			"request", requestContext.Request,
+			map[string]interface{}{
+				"ref":     command.ReferenceName,
+				"request": requestContext.Request,
+			},
 		)
 		return githttp.ErrNonFastForward
 	}
@@ -1532,8 +1533,10 @@ func (p *gitProtocol) validateUpdate(
 		!strings.HasPrefix(command.ReferenceName, "refs/changes/") {
 		p.log.Error(
 			"invalid reference",
-			"ref", command.ReferenceName,
-			"request", requestContext.Request,
+			map[string]interface{}{
+				"ref":     command.ReferenceName,
+				"request": requestContext.Request,
+			},
 		)
 		return githttp.ErrInvalidRef
 	}
@@ -1545,8 +1548,10 @@ func (p *gitProtocol) validateUpdate(
 		command.ReferenceName == "refs/heads/private" {
 		p.log.Error(
 			"read-only reference",
-			"ref", command.ReferenceName,
-			"request", requestContext.Request,
+			map[string]interface{}{
+				"ref":     command.ReferenceName,
+				"request": requestContext.Request,
+			},
 		)
 		return githttp.ErrReadOnlyRef
 	}
@@ -1555,8 +1560,10 @@ func (p *gitProtocol) validateUpdate(
 		if !requestContext.Request.CanEdit {
 			p.log.Error(
 				"cannot modify reference due to not having permissions",
-				"ref", command.ReferenceName,
-				"request", requestContext.Request,
+				map[string]interface{}{
+					"ref":     command.ReferenceName,
+					"request": requestContext.Request,
+				},
 			)
 			return githttp.ErrForbidden
 		}
@@ -1573,8 +1580,10 @@ func (p *gitProtocol) validateUpdate(
 		if !requestContext.Request.CanEdit {
 			p.log.Error(
 				"cannot modify reference due to not having permissions",
-				"ref", command.ReferenceName,
-				"request", requestContext.Request,
+				map[string]interface{}{
+					"ref":     command.ReferenceName,
+					"request": requestContext.Request,
+				},
 			)
 			return githttp.ErrForbidden
 		}
@@ -1583,8 +1592,10 @@ func (p *gitProtocol) validateUpdate(
 		if !requestContext.Request.IsAdmin {
 			p.log.Error(
 				"cannot modify reference due to being non-admin",
-				"ref", command.ReferenceName,
-				"request", requestContext.Request,
+				map[string]interface{}{
+					"ref":     command.ReferenceName,
+					"request": requestContext.Request,
+				},
 			)
 			return githttp.ErrForbidden
 		}
@@ -1593,8 +1604,10 @@ func (p *gitProtocol) validateUpdate(
 		if !requestContext.Request.CanEdit && !requestContext.Request.HasSolved {
 			p.log.Error(
 				"cannot modify reference due to not having permissions",
-				"ref", command.ReferenceName,
-				"request", requestContext.Request,
+				map[string]interface{}{
+					"ref":     command.ReferenceName,
+					"request": requestContext.Request,
+				},
 			)
 			return githttp.ErrForbidden
 		}
@@ -1604,8 +1617,10 @@ func (p *gitProtocol) validateUpdate(
 	if !requestContext.Request.CanEdit && !requestContext.Request.HasSolved {
 		p.log.Error(
 			"cannot modify reference due to not having permissions",
-			"ref", command.ReferenceName,
-			"request", requestContext.Request,
+			map[string]interface{}{
+				"ref":     command.ReferenceName,
+				"request": requestContext.Request,
+			},
 		)
 		return githttp.ErrForbidden
 	}
@@ -1701,7 +1716,14 @@ func (p *gitProtocol) preprocessMaster(
 		}
 		defer masterCommit.Free()
 	}
-	p.log.Info("Updating ref", "ref", masterRef, "err", err, "masterCommit", masterCommit)
+	p.log.Info(
+		"Updating ref",
+		map[string]interface{}{
+			"ref":          masterRef,
+			"err":          err,
+			"masterCommit": masterCommit,
+		},
+	)
 
 	requestContext := request.FromContext(ctx)
 	reviewRef := requestContext.Request.ReviewRef
@@ -1747,7 +1769,12 @@ func (p *gitProtocol) preprocess(
 	originalCommands []*githttp.GitCommand,
 ) (string, []*githttp.GitCommand, error) {
 	defer tracing.FromContext(ctx).StartSegment("preprocess").End()
-	p.log.Info("Updating", "reference", originalCommands)
+	p.log.Info(
+		"Updating",
+		map[string]interface{}{
+			"reference": originalCommands,
+		},
+	)
 	if originalCommands[0].ReferenceName == "refs/heads/master" {
 		return p.preprocessMaster(ctx, originalRepo, tmpDir, originalPackPath, originalCommands)
 	}
@@ -1759,7 +1786,7 @@ type GitHandlerOpts struct {
 	RootPath string
 	Protocol *githttp.GitProtocol
 	Metrics  base.Metrics
-	Log      log15.Logger
+	Log      logging.Logger
 	Tracing  tracing.Provider
 }
 

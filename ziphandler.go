@@ -21,11 +21,11 @@ import (
 
 	"github.com/omegaup/githttp/v2"
 	"github.com/omegaup/gitserver/request"
-	base "github.com/omegaup/go-base/v2"
-	"github.com/omegaup/go-base/v2/tracing"
+	base "github.com/omegaup/go-base/v3"
+	"github.com/omegaup/go-base/v3/logging"
+	"github.com/omegaup/go-base/v3/tracing"
 	"github.com/omegaup/quark/common"
 
-	"github.com/inconshreveable/log15"
 	git "github.com/libgit2/git2go/v33"
 	"github.com/pkg/errors"
 )
@@ -368,7 +368,7 @@ func CreatePackfile(
 	author, committer *git.Signature,
 	commitMessage string,
 	w io.Writer,
-	log log15.Logger,
+	log logging.Logger,
 ) (*git.Oid, error) {
 	defer tracing.FromContext(ctx).StartSegment("CreatePackfile").End()
 	odb, err := repo.Odb()
@@ -629,7 +629,13 @@ func CreatePackfile(
 	defer treebuilder.Free()
 
 	for topLevelComponent, files := range trees {
-		log.Debug("Building top-level tree", "name", topLevelComponent, "files", files)
+		log.Debug(
+			"Building top-level tree",
+			map[string]interface{}{
+				"name":  topLevelComponent,
+				"files": files,
+			},
+		)
 		tree, err := githttp.BuildTree(repo, files, log)
 		if err != nil {
 			return nil, base.ErrorWithCategory(
@@ -657,7 +663,13 @@ func CreatePackfile(
 	}
 
 	for topLevelComponent, oid := range topLevelEntries {
-		log.Debug("Adding top-level file", "name", topLevelComponent, "id", oid.String())
+		log.Debug(
+			"Adding top-level file",
+			map[string]interface{}{
+				"name": topLevelComponent,
+				"id":   oid.String(),
+			},
+		)
 		if err = treebuilder.Insert(topLevelComponent, oid, 0100644); err != nil {
 			return nil, base.ErrorWithCategory(
 				ErrInternalGit,
@@ -772,7 +784,12 @@ func CreatePackfile(
 		treeID = mergedTree.Id()
 	}
 
-	log.Debug("Final tree created", "id", treeID.String())
+	log.Debug(
+		"Final tree created",
+		map[string]interface{}{
+			"id": treeID.String(),
+		},
+	)
 	tree, err := repo.LookupTree(treeID)
 	if err != nil {
 		return nil, base.ErrorWithCategory(
@@ -956,7 +973,7 @@ func ConvertZipToPackfile(
 	commitMessage string,
 	acceptsSubmissions bool,
 	w io.Writer,
-	log log15.Logger,
+	log logging.Logger,
 ) (*git.Oid, error) {
 	defer tracing.FromContext(ctx).StartSegment("ConvertZipToPackfile").End()
 	contents := make(map[string]io.Reader)
@@ -991,7 +1008,12 @@ func ConvertZipToPackfile(
 			}
 
 			if !isValidFile {
-				log.Info("Skipping file", "path", zipfilePath)
+				log.Info(
+					"Skipping file",
+					map[string]interface{}{
+						"path": zipfilePath,
+					},
+				)
 			}
 
 			zipFile, err := problemFiles.Open(zipfilePath)
@@ -1099,7 +1121,9 @@ func ConvertZipToPackfile(
 
 	log.Info(
 		"Zip is valid",
-		"Files", problemFiles.Files(),
+		map[string]interface{}{
+			"Files": problemFiles.Files(),
+		},
 	)
 
 	return CreatePackfile(
@@ -1133,7 +1157,7 @@ func PushZip(
 	acceptsSubmissions bool,
 	updatePublished bool,
 	protocol *githttp.GitProtocol,
-	log log15.Logger,
+	log logging.Logger,
 ) (*UpdateResult, error) {
 	defer tracing.FromContext(ctx).StartSegment("PushZip").End()
 	oldOid := &git.Oid{}
@@ -1246,7 +1270,7 @@ func PushZip(
 			}
 		}
 		if masterNewOid.IsZero() {
-			log.Error("could not find the updated reference for master")
+			log.Error("could not find the updated reference for master", nil)
 		} else {
 			if publishedBranch, err := repo.LookupBranch("published", git.BranchLocal); err == nil {
 				publishedUpdatedRef.From = publishedBranch.Target().String()
@@ -1280,7 +1304,7 @@ type zipUploadHandler struct {
 	rootPath string
 	protocol *githttp.GitProtocol
 	metrics  base.Metrics
-	log      log15.Logger
+	log      logging.Logger
 	tracing  tracing.Provider
 }
 
@@ -1288,6 +1312,7 @@ func (h *zipUploadHandler) handleGitUploadZip(
 	w http.ResponseWriter,
 	r *http.Request,
 	repositoryName string,
+	log logging.Logger,
 ) {
 	txn := tracing.FromContext(r.Context())
 	if r.Method != "POST" {
@@ -1299,7 +1324,12 @@ func (h *zipUploadHandler) handleGitUploadZip(
 	var paramValue func(string) string
 	if strings.HasPrefix(r.Header.Get("Content-Type"), "multipart/form-data") {
 		if err := r.ParseMultipartForm((32 * base.Mebibyte).Bytes()); err != nil {
-			h.log.Error("Unable to parse multipart form", "err", err)
+			log.Error(
+				"Unable to parse multipart form",
+				map[string]interface{}{
+					"err": err,
+				},
+			)
 			w.WriteHeader(http.StatusBadRequest)
 			return
 		}
@@ -1310,7 +1340,12 @@ func (h *zipUploadHandler) handleGitUploadZip(
 		var err error
 		requestZip, requestZipHeader, err = r.FormFile("contents")
 		if err != nil {
-			h.log.Error("Invalid contents", "err", err)
+			log.Error(
+				"Invalid contents",
+				map[string]interface{}{
+					"err": err,
+				},
+			)
 			w.WriteHeader(http.StatusBadRequest)
 			return
 		}
@@ -1325,14 +1360,19 @@ func (h *zipUploadHandler) handleGitUploadZip(
 		}
 		requestZip = r.Body
 	} else {
-		h.log.Error("Bad content type", "Content-Type", r.Header.Get("Content-Type"))
+		log.Error(
+			"Bad content type",
+			map[string]interface{}{
+				"Content-Type": r.Header.Get("Content-Type"),
+			},
+		)
 		w.WriteHeader(http.StatusUnsupportedMediaType)
 		return
 	}
 
 	commitMessage := paramValue("message")
 	if commitMessage == "" {
-		h.log.Error("Missing 'message' field")
+		log.Error("Missing 'message' field", nil)
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
@@ -1340,7 +1380,12 @@ func (h *zipUploadHandler) handleGitUploadZip(
 	if paramValue("settings") != "" {
 		var unmarshaledSettings common.ProblemSettings
 		if err := json.Unmarshal([]byte(paramValue("settings")), &unmarshaledSettings); err != nil {
-			h.log.Error("invalid settings", "err", err)
+			log.Error(
+				"invalid settings",
+				map[string]interface{}{
+					"err": err,
+				},
+			)
 			w.WriteHeader(http.StatusBadRequest)
 			return
 		}
@@ -1352,7 +1397,12 @@ func (h *zipUploadHandler) handleGitUploadZip(
 		paramValue("updatePublished") == "true")
 	zipMergeStrategy, err := ParseZipMergeStrategy(paramValue("mergeStrategy"))
 	if err != nil {
-		h.log.Error("invalid merge strategy", "mergeStrategy", paramValue("mergeStrategy"))
+		log.Error(
+			"invalid merge strategy",
+			map[string]interface{}{
+				"mergeStrategy": paramValue("mergeStrategy"),
+			},
+		)
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
@@ -1362,17 +1412,29 @@ func (h *zipUploadHandler) handleGitUploadZip(
 	requestContext.Request.Create = r.URL.Query().Get("create") != ""
 
 	repositoryPath := path.Join(h.rootPath, repositoryName)
-	h.log.Info(
+	log.Info(
 		"git-upload-zip",
-		"path", repositoryPath,
-		"create", requestContext.Request.Create,
+		map[string]interface{}{
+			"path":   repositoryPath,
+			"create": requestContext.Request.Create,
+		},
 	)
 	if _, err := os.Stat(repositoryPath); os.IsNotExist(err) != requestContext.Request.Create {
 		if requestContext.Request.Create {
-			h.log.Error("Creating on top of an existing directory", "path", repositoryPath)
+			log.Error(
+				"Creating on top of an existing directory",
+				map[string]interface{}{
+					"path": repositoryPath,
+				},
+			)
 			w.WriteHeader(http.StatusConflict)
 		} else {
-			h.log.Error("Updating a missing directory", "path", repositoryPath)
+			log.Error(
+				"Updating a missing directory",
+				map[string]interface{}{
+					"path": repositoryPath,
+				},
+			)
 			w.WriteHeader(http.StatusNotFound)
 		}
 		return
@@ -1392,7 +1454,13 @@ func (h *zipUploadHandler) handleGitUploadZip(
 
 	zipSize, err := io.Copy(tempfile, &io.LimitedReader{R: requestZip, N: maxAllowedZipSize.Bytes()})
 	if err != nil {
-		h.log.Error("failed to copy zip", "err", err, "zipSize", zipSize)
+		log.Error(
+			"failed to copy zip",
+			map[string]interface{}{
+				"err":     err,
+				"zipSize": zipSize,
+			},
+		)
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
@@ -1402,7 +1470,12 @@ func (h *zipUploadHandler) handleGitUploadZip(
 	}
 	zipReader, err := zip.OpenReader(tempfile.Name())
 	if err != nil {
-		h.log.Error("failed to read zip", "err", err)
+		log.Error(
+			"failed to read zip",
+			map[string]interface{}{
+				"err": err,
+			},
+		)
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
@@ -1423,7 +1496,12 @@ func (h *zipUploadHandler) handleGitUploadZip(
 	if requestContext.Request.Create {
 		dir, err := ioutil.TempDir(filepath.Dir(repositoryPath), "repository")
 		if err != nil {
-			h.log.Error("Failed to create temporary directory", "err", err)
+			log.Error(
+				"Failed to create temporary directory",
+				map[string]interface{}{
+					"err": err,
+				},
+			)
 			w.WriteHeader(http.StatusInternalServerError)
 			openRepoSegment.End()
 			return
@@ -1431,7 +1509,12 @@ func (h *zipUploadHandler) handleGitUploadZip(
 		defer os.RemoveAll(dir)
 
 		if err := os.Chmod(dir, 0755); err != nil {
-			h.log.Error("Failed to chmod temporary directory", "err", err)
+			log.Error(
+				"Failed to chmod temporary directory",
+				map[string]interface{}{
+					"err": err,
+				},
+			)
 			w.WriteHeader(http.StatusInternalServerError)
 			openRepoSegment.End()
 			return
@@ -1439,7 +1522,12 @@ func (h *zipUploadHandler) handleGitUploadZip(
 
 		repo, err = InitRepository(ctx, dir)
 		if err != nil {
-			h.log.Error("failed to init repository", "err", err)
+			log.Error(
+				"failed to init repository",
+				map[string]interface{}{
+					"err": err,
+				},
+			)
 			w.WriteHeader(http.StatusInternalServerError)
 			openRepoSegment.End()
 			return
@@ -1450,7 +1538,12 @@ func (h *zipUploadHandler) handleGitUploadZip(
 	} else {
 		repo, err = git.OpenRepository(repositoryPath)
 		if err != nil {
-			h.log.Error("failed to open repository", "err", err)
+			log.Error(
+				"failed to open repository",
+				map[string]interface{}{
+					"err": err,
+				},
+			)
 			w.WriteHeader(http.StatusInternalServerError)
 			openRepoSegment.End()
 			return
@@ -1462,11 +1555,21 @@ func (h *zipUploadHandler) handleGitUploadZip(
 	acquireLockSegment := txn.StartSegment("acquire lock")
 	lockfile := githttp.NewLockfile(repo.Path())
 	if ok, err := lockfile.TryRLock(); !ok {
-		h.log.Info("Waiting for the lockfile", "err", err)
+		log.Info(
+			"Waiting for the lockfile",
+			map[string]interface{}{
+				"err": err,
+			},
+		)
 		err := lockfile.RLock()
 		acquireLockSegment.End()
 		if err != nil {
-			h.log.Crit("Failed to acquire the lockfile", "err", err)
+			log.Error(
+				"Failed to acquire the lockfile",
+				map[string]interface{}{
+					"err": err,
+				},
+			)
 			w.WriteHeader(http.StatusInternalServerError)
 			return
 		}
@@ -1492,11 +1595,17 @@ func (h *zipUploadHandler) handleGitUploadZip(
 		acceptsSubmissions,
 		updatePublished,
 		h.protocol,
-		h.log,
+		log,
 	)
 	pushZipSegment.End()
 	if err != nil {
-		h.log.Error("push failed", "path", repositoryPath, "err", err)
+		log.Error(
+			"push failed",
+			map[string]interface{}{
+				"path": repositoryPath,
+				"err":  err,
+			},
+		)
 		cause := githttp.WriteHeader(w, err, false)
 
 		updateResult = &UpdateResult{
@@ -1505,11 +1614,24 @@ func (h *zipUploadHandler) handleGitUploadZip(
 		}
 	} else {
 		if err := commitCallback(); err != nil {
-			h.log.Info("push successful, but commit failed", "path", repositoryPath, "result", updateResult, "err", err)
+			log.Info(
+				"push successful, but commit failed",
+				map[string]interface{}{
+					"path":   repositoryPath,
+					"result": updateResult,
+					"err":    err,
+				},
+			)
 			w.WriteHeader(http.StatusInternalServerError)
 			return
 		}
-		h.log.Info("push successful", "path", repositoryPath, "result", updateResult)
+		log.Info(
+			"push successful",
+			map[string]interface{}{
+				"path":   repositoryPath,
+				"result": updateResult,
+			},
+		)
 		w.WriteHeader(http.StatusOK)
 	}
 
@@ -1523,6 +1645,7 @@ func (h *zipUploadHandler) handleRenameRepository(
 	r *http.Request,
 	repositoryName string,
 	targetRepositoryName string,
+	log logging.Logger,
 ) {
 	if r.Method != "GET" {
 		w.WriteHeader(http.StatusMethodNotAllowed)
@@ -1533,26 +1656,35 @@ func (h *zipUploadHandler) handleRenameRepository(
 
 	repositoryPath := path.Join(h.rootPath, repositoryName)
 	targetRepositoryPath := path.Join(h.rootPath, targetRepositoryName)
-	h.log.Info(
+	log.Info(
 		"rename-repository",
-		"path", repositoryPath,
-		"target path", targetRepositoryPath,
+		map[string]interface{}{
+			"path":        repositoryPath,
+			"target path": targetRepositoryPath,
+		},
 	)
 
 	level, _ := h.protocol.AuthCallback(ctx, w, r, repositoryName, githttp.OperationPush)
 	requestContext := request.FromContext(ctx)
 	if level != githttp.AuthorizationAllowed || !requestContext.Request.IsSystem {
-		h.log.Error(
+		log.Error(
 			"not allowed to rename repository",
-			"authorization level", level,
-			"request context", requestContext.Request,
+			map[string]interface{}{
+				"authorization level": level,
+				"request context":     requestContext.Request,
+			},
 		)
 		w.WriteHeader(http.StatusForbidden)
 		return
 	}
 
 	if err := os.Rename(repositoryPath, targetRepositoryPath); err != nil {
-		h.log.Error("failed to rename repository", "err", err)
+		log.Error(
+			"failed to rename repository",
+			map[string]interface{}{
+				"err": err,
+			},
+		)
 		if os.IsNotExist(err) {
 		} else if os.IsExist(err) {
 			w.WriteHeader(http.StatusNotFound)
@@ -1564,15 +1696,18 @@ func (h *zipUploadHandler) handleRenameRepository(
 		return
 	}
 
-	h.log.Info(
+	log.Info(
 		"rename successful",
-		"path", repositoryPath,
-		"target path", targetRepositoryPath,
+		map[string]interface{}{
+			"path":        repositoryPath,
+			"target path": targetRepositoryPath,
+		},
 	)
 	w.WriteHeader(http.StatusOK)
 }
 
 func (h *zipUploadHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	log := h.log.NewContext(r.Context())
 	splitPath := strings.Split(r.URL.Path[1:], "/")
 	if len(splitPath) < 2 {
 		w.WriteHeader(http.StatusNotFound)
@@ -1589,7 +1724,7 @@ func (h *zipUploadHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusNotFound)
 			return
 		}
-		h.handleGitUploadZip(w, r, repositoryName)
+		h.handleGitUploadZip(w, r, repositoryName, log)
 		return
 	}
 	if splitPath[1] == "rename-repository" {
@@ -1597,10 +1732,15 @@ func (h *zipUploadHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusNotFound)
 			return
 		}
-		h.handleRenameRepository(w, r, repositoryName, splitPath[2])
+		h.handleRenameRepository(w, r, repositoryName, splitPath[2], log)
 		return
 	}
-	h.log.Error("failed to rename repository", "split path", splitPath)
+	log.Error(
+		"failed to rename repository",
+		map[string]interface{}{
+			"split path": splitPath,
+		},
+	)
 	w.WriteHeader(http.StatusNotFound)
 }
 
@@ -1609,7 +1749,7 @@ type ZipHandlerOpts struct {
 	RootPath string
 	Protocol *githttp.GitProtocol
 	Metrics  base.Metrics
-	Log      log15.Logger
+	Log      logging.Logger
 	Tracing  tracing.Provider
 }
 
@@ -1617,9 +1757,6 @@ type ZipHandlerOpts struct {
 func NewZipHandler(opts ZipHandlerOpts) http.Handler {
 	if opts.Metrics == nil {
 		opts.Metrics = &base.NoOpMetrics{}
-	}
-	if opts.Log == nil {
-		opts.Log = log15.New()
 	}
 	if opts.Tracing == nil {
 		opts.Tracing = tracing.NewNoOpProvider()

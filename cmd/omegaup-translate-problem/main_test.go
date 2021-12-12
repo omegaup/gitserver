@@ -8,7 +8,7 @@ import (
 	"reflect"
 	"testing"
 
-	base "github.com/omegaup/go-base/v2"
+	"github.com/omegaup/go-base/logging/log15"
 )
 
 func TestRoundtrip(t *testing.T) {
@@ -21,7 +21,10 @@ func TestRoundtrip(t *testing.T) {
 	}
 	ctx := context.Background()
 
-	log := base.StderrLog(false)
+	log, err := log15.New("info", false)
+	if err != nil {
+		t.Fatalf("Failed to create log: %v", err)
+	}
 
 	mergedPath := path.Join(dirName, "merged")
 	unmergedPath := path.Join(dirName, "unmerged")

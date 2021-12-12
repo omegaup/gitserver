@@ -7,16 +7,17 @@ import (
 	"os"
 	"strings"
 
-	"github.com/inconshreveable/log15"
+	"github.com/omegaup/go-base/logging/log15"
+	"github.com/omegaup/go-base/v3/logging"
+
 	git "github.com/libgit2/git2go/v33"
-	base "github.com/omegaup/go-base/v2"
 )
 
 var (
 	repositoryPath = flag.String("repository", "", "Repository path")
 	commit         = flag.Bool("commit", false, "Add packfiles to the repository")
 
-	log log15.Logger
+	log logging.Logger
 )
 
 func processOnePackfile(
@@ -30,7 +31,12 @@ func processOnePackfile(
 	}
 
 	indexer, err := git.NewIndexer(".", odb, func(stats git.TransferProgress) error {
-		log.Debug("Progress", "stats", stats)
+		log.Debug(
+			"Progress",
+			map[string]interface{}{
+				"stats": stats,
+			},
+		)
 		return nil
 	})
 	if err != nil {
@@ -46,7 +52,12 @@ func processOnePackfile(
 	if err != nil {
 		panic(err)
 	}
-	log.Info("Done!", "hash", hash)
+	log.Info(
+		"Done!",
+		map[string]interface{}{
+			"hash": hash,
+		},
+	)
 
 	if *commit {
 		f, err := os.Open(fmt.Sprintf("pack-%s.pack", hash))
@@ -119,13 +130,24 @@ func processObject(repository *git.Repository, oid *git.Oid, message string) err
 		defer commit.Free()
 		contents = commit.RawMessage()
 	}
-	log.Debug("Exists now", "oid", oid, "type", obj.Type(), "contents", contents)
+	log.Debug(
+		"Exists now",
+		map[string]interface{}{
+			"oid":      oid,
+			"type":     obj.Type(),
+			"contents": contents,
+		},
+	)
 	return nil
 }
 
 func main() {
 	flag.Parse()
-	log = base.StderrLog(false)
+	var err error
+	log, err = log15.New("info", false)
+	if err != nil {
+		panic(err)
+	}
 
 	var repository *git.Repository
 	var odb *git.Odb
@@ -178,5 +200,11 @@ func main() {
 		}
 		return processObject(repository, oid, "Exists now")
 	})
-	log.Info("Done", "before", beforeObjectsCount, "after", afterObjects)
+	log.Info(
+		"Done",
+		map[string]interface{}{
+			"before": beforeObjectsCount,
+			"after":  afterObjects,
+		},
+	)
 }

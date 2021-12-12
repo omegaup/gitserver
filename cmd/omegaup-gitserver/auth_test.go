@@ -2,9 +2,11 @@ package main
 
 import (
 	"encoding/base64"
-	base "github.com/omegaup/go-base/v2"
-	"golang.org/x/crypto/ed25519"
 	"testing"
+
+	"github.com/omegaup/go-base/logging/log15"
+
+	"golang.org/x/crypto/ed25519"
 )
 
 const (
@@ -25,7 +27,10 @@ func TestVerifyArgon2idHash(t *testing.T) {
 }
 
 func TestParseBearerAuth(t *testing.T) {
-	log := base.StderrLog(false)
+	log, err := log15.New("info", true)
+	if err != nil {
+		t.Fatalf("Failed to create log: %v", err)
+	}
 	keyBytes, err := base64.StdEncoding.DecodeString(DefaultConfig().Gitserver.PublicKey)
 	if err != nil {
 		t.Fatalf("failed to parse shared key: %v", err)
