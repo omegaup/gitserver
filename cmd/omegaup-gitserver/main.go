@@ -202,15 +202,21 @@ func main() {
 
 	var servers []*http.Server
 	var wg sync.WaitGroup
+	writeTimeout := 2 * time.Minute // Frontend has a 120s second timeout.
 	gitServer := &http.Server{
 		Addr: fmt.Sprintf(":%d", config.Gitserver.Port),
-		Handler: muxHandler(
-			app,
-			config.Gitserver.Port,
-			config.Gitserver.RootPath,
-			protocol,
-			log,
+		Handler: http.TimeoutHandler(
+			muxHandler(
+				app,
+				config.Gitserver.Port,
+				config.Gitserver.RootPath,
+				protocol,
+				log,
+			),
+			writeTimeout,
+			"Timeout",
 		),
+		WriteTimeout: writeTimeout,
 	}
 	servers = append(servers, gitServer)
 	wg.Add(1)

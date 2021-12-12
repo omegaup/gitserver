@@ -220,6 +220,8 @@ github.com/oklog/run v1.0.0/go.mod h1:dlhp/R75TPv97u0XWUtDeV/lRKWPKSdTuV0TZvrmrQ
 github.com/olekukonko/tablewriter v0.0.0-20170122224234-a0225b3f23b5/go.mod h1:vsDQFd/mU46D+Z4whnwzcISnGGzXWMclvtLoiIKAKIo=
 github.com/omegaup/githttp/v2 v2.4.0 h1:JzofX/w5GcSpT2WSJqQxZB1PwRwn0lguN1qjedM25Gg=
 github.com/omegaup/githttp/v2 v2.4.0/go.mod h1:TQ9YAhkWccbhyLQ6HAYElCgO8qpYqhNlhCnCbOGCMP0=
+github.com/omegaup/githttp/v2 v2.4.1 h1:8sW2TG1CUi3vbUBcO7FYZEklBQUrORXRaLOc6CC34iQ=
+github.com/omegaup/githttp/v2 v2.4.1/go.mod h1:TQ9YAhkWccbhyLQ6HAYElCgO8qpYqhNlhCnCbOGCMP0=
 github.com/omegaup/go-base/logging/log15 v0.0.0-20211211212159-014332e01547 h1:+SBWLdt2W+OwgpSmpa7AQyfUP7e/vMRtZpxINbYObaY=
 github.com/omegaup/go-base/logging/log15 v0.0.0-20211211212159-014332e01547/go.mod h1:adWq3jVZVRlre+15uby0M/AQiAFdpQPYnXiKK90KD4Q=
 github.com/omegaup/go-base/tracing/newrelic v0.0.0-20211211212159-014332e01547 h1:4xRiCayV7L85BMdfEIpW+jJJd6TvphVP/QVh+Mp6rUw=
