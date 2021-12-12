@@ -14,7 +14,7 @@ import (
 
 	"github.com/omegaup/githttp/v2"
 	"github.com/omegaup/gitserver"
-	base "github.com/omegaup/go-base/v2"
+	"github.com/omegaup/go-base/logging/log15"
 )
 
 var (
@@ -35,7 +35,10 @@ func TestHealth(t *testing.T) {
 
 	ctx := context.Background()
 
-	log := base.StderrLog(false)
+	log, err := log15.New("info", false)
+	if err != nil {
+		t.Fatalf("Failed to create log: %v", err)
+	}
 	ts := httptest.NewUnstartedServer(nil)
 	_, portString, err := net.SplitHostPort(ts.Listener.Addr().String())
 	if err != nil {

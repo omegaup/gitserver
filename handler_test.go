@@ -22,10 +22,10 @@ import (
 	"github.com/omegaup/githttp/v2"
 	"github.com/omegaup/gitserver/gitservertest"
 	"github.com/omegaup/gitserver/request"
-	base "github.com/omegaup/go-base/v2"
+	"github.com/omegaup/go-base/logging/log15"
+	"github.com/omegaup/go-base/v3/logging"
 	"github.com/omegaup/quark/common"
 
-	"github.com/inconshreveable/log15"
 	git "github.com/libgit2/git2go/v33"
 )
 
@@ -159,7 +159,7 @@ func createCommit(
 	oldOid *git.Oid,
 	contents map[string]io.Reader,
 	commitMessage string,
-	log log15.Logger,
+	log logging.Logger,
 ) (*git.Oid, []byte) {
 	repo, err := git.OpenRepository(path.Join(tmpDir, problemAlias))
 	if err != nil {
@@ -290,7 +290,10 @@ func TestInvalidRef(t *testing.T) {
 	}
 	ctx := context.Background()
 
-	log := base.StderrLog(false)
+	log, err := log15.New("info", false)
+	if err != nil {
+		t.Fatalf("Failed to create log: %v", err)
+	}
 	ts := httptest.NewServer(NewGitHandler(GitHandlerOpts{
 		RootPath: tmpDir,
 		Protocol: NewGitProtocol(GitProtocolOpts{
@@ -369,7 +372,10 @@ func TestDelete(t *testing.T) {
 	}
 	ctx := context.Background()
 
-	log := base.StderrLog(false)
+	log, err := log15.New("info", false)
+	if err != nil {
+		t.Fatalf("Failed to create log: %v", err)
+	}
 	ts := httptest.NewServer(NewGitHandler(GitHandlerOpts{
 		RootPath: tmpDir,
 		Protocol: NewGitProtocol(GitProtocolOpts{
@@ -451,7 +457,10 @@ func TestServerCreateReview(t *testing.T) {
 	}
 	ctx := context.Background()
 
-	log := base.StderrLog(false)
+	log, err := log15.New("info", false)
+	if err != nil {
+		t.Fatalf("Failed to create log: %v", err)
+	}
 	ts := httptest.NewServer(NewGitHandler(GitHandlerOpts{
 		RootPath: tmpDir,
 		Protocol: NewGitProtocol(GitProtocolOpts{
@@ -1247,7 +1256,10 @@ func TestPushGitbomb(t *testing.T) {
 	}
 	ctx := context.Background()
 
-	log := base.StderrLog(false)
+	log, err := log15.New("info", false)
+	if err != nil {
+		t.Fatalf("Failed to create log: %v", err)
+	}
 	ts := httptest.NewServer(NewGitHandler(GitHandlerOpts{
 		RootPath: tmpDir,
 		Protocol: NewGitProtocol(GitProtocolOpts{
@@ -1296,7 +1308,12 @@ func TestPushGitbomb(t *testing.T) {
 
 	fileMode := git.Filemode(0100644)
 	for i := 0; i < 24; i++ {
-		log.Debug("Creating gitbomb", "iteration", i)
+		log.Debug(
+			"Creating gitbomb",
+			map[string]interface{}{
+				"iteration": i,
+			},
+		)
 		treebuilder, err := repo.TreeBuilder()
 		if err != nil {
 			t.Fatalf("Failed to create TreeBuilder: %v", err)
@@ -1320,7 +1337,7 @@ func TestPushGitbomb(t *testing.T) {
 		t.Fatalf("Failed to lookup tree: %v", err)
 	}
 
-	log.Debug("Tree looked up")
+	log.Debug("Tree looked up", nil)
 
 	newCommitID, err := repo.CreateCommit(
 		"",
@@ -1371,7 +1388,10 @@ func TestConfig(t *testing.T) {
 	}
 	ctx := context.Background()
 
-	log := base.StderrLog(false)
+	log, err := log15.New("info", false)
+	if err != nil {
+		t.Fatalf("Failed to create log: %v", err)
+	}
 	ts := httptest.NewServer(NewGitHandler(GitHandlerOpts{
 		RootPath: tmpDir,
 		Protocol: NewGitProtocol(GitProtocolOpts{
@@ -1725,7 +1745,10 @@ func TestInteractive(t *testing.T) {
 	}
 	ctx := context.Background()
 
-	log := base.StderrLog(false)
+	log, err := log15.New("info", false)
+	if err != nil {
+		t.Fatalf("Failed to create log: %v", err)
+	}
 	ts := httptest.NewServer(NewGitHandler(GitHandlerOpts{
 		RootPath: tmpDir,
 		Protocol: NewGitProtocol(GitProtocolOpts{
@@ -1896,7 +1919,10 @@ func TestExampleCases(t *testing.T) {
 	}
 	ctx := context.Background()
 
-	log := base.StderrLog(false)
+	log, err := log15.New("info", false)
+	if err != nil {
+		t.Fatalf("Failed to create log: %v", err)
+	}
 	ts := httptest.NewServer(NewGitHandler(GitHandlerOpts{
 		RootPath: tmpDir,
 		Protocol: NewGitProtocol(GitProtocolOpts{
@@ -2229,7 +2255,10 @@ func TestStatements(t *testing.T) {
 	}
 	ctx := context.Background()
 
-	log := base.StderrLog(false)
+	log, err := log15.New("info", false)
+	if err != nil {
+		t.Fatalf("Failed to create log: %v", err)
+	}
 	ts := httptest.NewServer(NewGitHandler(GitHandlerOpts{
 		RootPath: tmpDir,
 		Protocol: NewGitProtocol(GitProtocolOpts{
@@ -2331,7 +2360,10 @@ func TestTests(t *testing.T) {
 	}
 	ctx := context.Background()
 
-	log := base.StderrLog(false)
+	log, err := log15.New("info", false)
+	if err != nil {
+		t.Fatalf("Failed to create log: %v", err)
+	}
 	ts := httptest.NewServer(NewGitHandler(GitHandlerOpts{
 		RootPath: tmpDir,
 		Protocol: NewGitProtocol(GitProtocolOpts{

@@ -20,7 +20,8 @@ import (
 
 	"github.com/omegaup/githttp/v2"
 	"github.com/omegaup/gitserver/gitservertest"
-	base "github.com/omegaup/go-base/v2"
+	"github.com/omegaup/go-base/logging/log15"
+	base "github.com/omegaup/go-base/v3"
 	"github.com/omegaup/quark/common"
 
 	git "github.com/libgit2/git2go/v33"
@@ -155,7 +156,10 @@ func TestPushZip(t *testing.T) {
 		defer os.RemoveAll(tmpDir)
 	}
 
-	log := base.StderrLog(false)
+	log, err := log15.New("info", false)
+	if err != nil {
+		t.Fatalf("Failed to create log: %v", err)
+	}
 	ts := httptest.NewServer(NewZipHandler(ZipHandlerOpts{
 		RootPath: tmpDir,
 		Protocol: NewGitProtocol(GitProtocolOpts{
@@ -246,7 +250,10 @@ func TestConvertZip(t *testing.T) {
 	}
 	defer repo.Free()
 
-	log := base.StderrLog(false)
+	log, err := log15.New("info", false)
+	if err != nil {
+		t.Fatalf("Failed to create log: %v", err)
+	}
 
 	fileContents := map[string]string{
 		".gitignore":             defaultGitfiles[".gitignore"],
@@ -315,7 +322,10 @@ func TestZiphandlerCases(t *testing.T) {
 
 	problemAlias := "sumas"
 
-	log := base.StderrLog(false)
+	log, err := log15.New("info", false)
+	if err != nil {
+		t.Fatalf("Failed to create log: %v", err)
+	}
 
 	ts := httptest.NewServer(NewZipHandler(ZipHandlerOpts{
 		RootPath: tmpDir,
@@ -403,7 +413,10 @@ func TestZiphandlerSolutions(t *testing.T) {
 
 	problemAlias := "sumas"
 
-	log := base.StderrLog(false)
+	log, err := log15.New("info", false)
+	if err != nil {
+		t.Fatalf("Failed to create log: %v", err)
+	}
 
 	ts := httptest.NewServer(NewZipHandler(ZipHandlerOpts{
 		RootPath: tmpDir,
@@ -486,7 +499,10 @@ func TestZiphandlerStatements(t *testing.T) {
 	}
 	defer repo.Free()
 
-	log := base.StderrLog(false)
+	log, err := log15.New("info", false)
+	if err != nil {
+		t.Fatalf("Failed to create log: %v", err)
+	}
 
 	for idx, testcase := range []struct {
 		name          string
@@ -571,7 +587,10 @@ func TestTestplan(t *testing.T) {
 	}
 	defer repo.Free()
 
-	log := base.StderrLog(false)
+	log, err := log15.New("info", false)
+	if err != nil {
+		t.Fatalf("Failed to create log: %v", err)
+	}
 
 	for testplanContents, expectedError := range map[string]string{
 		"0 0.0.0.0":        "invalid-testplan: invalid weight '0.0.0.0': strconv.ParseFloat: parsing \"0.0.0.0\": invalid syntax",
@@ -634,7 +653,10 @@ func TestUpdateProblemSettings(t *testing.T) {
 		defer os.RemoveAll(tmpDir)
 	}
 
-	log := base.StderrLog(false)
+	log, err := log15.New("info", false)
+	if err != nil {
+		t.Fatalf("Failed to create log: %v", err)
+	}
 	ts := httptest.NewServer(NewZipHandler(ZipHandlerOpts{
 		RootPath: tmpDir,
 		Protocol: NewGitProtocol(GitProtocolOpts{
@@ -779,7 +801,10 @@ func TestUpdateProblemSettingsWithCustomValidator(t *testing.T) {
 		defer os.RemoveAll(tmpDir)
 	}
 
-	log := base.StderrLog(false)
+	log, err := log15.New("info", false)
+	if err != nil {
+		t.Fatalf("Failed to create log: %v", err)
+	}
 	ts := httptest.NewServer(NewZipHandler(ZipHandlerOpts{
 		RootPath: tmpDir,
 		Protocol: NewGitProtocol(GitProtocolOpts{
@@ -1037,7 +1062,10 @@ func TestRenameProblem(t *testing.T) {
 		defer os.RemoveAll(tmpDir)
 	}
 
-	log := base.StderrLog(false)
+	log, err := log15.New("info", false)
+	if err != nil {
+		t.Fatalf("Failed to create log: %v", err)
+	}
 	ts := httptest.NewServer(NewZipHandler(ZipHandlerOpts{
 		RootPath: tmpDir,
 		Protocol: NewGitProtocol(GitProtocolOpts{

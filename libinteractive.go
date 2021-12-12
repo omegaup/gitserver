@@ -6,8 +6,9 @@ import (
 	"io"
 	"os/exec"
 
-	"github.com/inconshreveable/log15"
+	"github.com/omegaup/go-base/v3/logging"
 	"github.com/omegaup/quark/common"
+
 	"github.com/pkg/errors"
 )
 
@@ -29,7 +30,7 @@ type InteractiveSettingsCompiler interface {
 type LibinteractiveCompiler struct {
 	// A way to optionally override the path of libinteractive.jar.
 	LibinteractiveJarPath string
-	Log                   log15.Logger
+	Log                   logging.Logger
 }
 
 // GetInteractiveSettings calls libinteractive.jar to produce the
@@ -63,7 +64,13 @@ func (c *LibinteractiveCompiler) GetInteractiveSettings(
 	go (func() {
 		defer stdin.Close()
 		if _, err := io.Copy(stdin, contents); err != nil {
-			c.Log.Error("Failed to write to libinteractive", "cmd", cmd, "err", err)
+			c.Log.Error(
+				"Failed to write to libinteractive",
+				map[string]interface{}{
+					"cmd": cmd,
+					"err": err,
+				},
+			)
 			stdinErrChan <- err
 		}
 		close(stdinErrChan)
@@ -82,8 +89,10 @@ func (c *LibinteractiveCompiler) GetInteractiveSettings(
 		if err := json.NewDecoder(stdout).Decode(&settings); err != nil {
 			c.Log.Error(
 				"Failed to read from libinteractive",
-				"cmd", cmd,
-				"err", err,
+				map[string]interface{}{
+					"cmd": cmd,
+					"err": err,
+				},
 			)
 			settingsChan <- nil
 		} else {
@@ -103,7 +112,13 @@ func (c *LibinteractiveCompiler) GetInteractiveSettings(
 	go (func() {
 		var buffer bytes.Buffer
 		if _, err := io.Copy(&buffer, stderr); err != nil {
-			c.Log.Error("Failed to copy libinteractive stderr", "cmd", cmd, "err", err)
+			c.Log.Error(
+				"Failed to copy libinteractive stderr",
+				map[string]interface{}{
+					"cmd": cmd,
+					"err": err,
+				},
+			)
 		}
 		stderrChan <- &buffer
 		close(stderrChan)
@@ -113,9 +128,11 @@ func (c *LibinteractiveCompiler) GetInteractiveSettings(
 		stderrError := errors.New((<-stderrChan).String())
 		c.Log.Error(
 			"Failed to run command",
-			"cmd", cmd,
-			"err", err,
-			"stderr", stderrError,
+			map[string]interface{}{
+				"cmd":    cmd,
+				"err":    err,
+				"stderr": stderrError,
+			},
 		)
 		return nil, errors.Wrap(
 			stderrError,

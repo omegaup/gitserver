@@ -14,13 +14,15 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/inconshreveable/log15"
-	git "github.com/libgit2/git2go/v33"
 	"github.com/omegaup/githttp/v2"
 	"github.com/omegaup/gitserver"
 	"github.com/omegaup/gitserver/request"
-	base "github.com/omegaup/go-base/v2"
+	"github.com/omegaup/go-base/logging/log15"
+	base "github.com/omegaup/go-base/v3"
+	"github.com/omegaup/go-base/v3/logging"
 	"github.com/omegaup/quark/common"
+
+	git "github.com/libgit2/git2go/v33"
 	"github.com/pkg/errors"
 )
 
@@ -63,7 +65,7 @@ func commitZipFile(
 	zipMergeStrategy gitserver.ZipMergeStrategy,
 	acceptsSubmissions bool,
 	updatePublished bool,
-	log log15.Logger,
+	log logging.Logger,
 ) (*gitserver.UpdateResult, error) {
 	ctx := request.NewContext(context.Background(), &base.NoOpMetrics{})
 	requestContext := request.FromContext(ctx)
@@ -109,7 +111,7 @@ func convertBlobsToPackfile(
 	author, committer *git.Signature,
 	commitMessage string,
 	w io.Writer,
-	log log15.Logger,
+	log logging.Logger,
 ) (*git.Oid, error) {
 	headCommit, err := repo.LookupCommit(parent)
 	if err != nil {
@@ -257,11 +259,16 @@ func commitBlobs(
 	authorUsername string,
 	commitMessage string,
 	contents map[string]io.Reader,
-	log log15.Logger,
+	log logging.Logger,
 ) (*gitserver.UpdateResult, error) {
 	reference, err := repo.Head()
 	if err != nil {
-		log.Error("Failed to get the repository's HEAD", "err", err)
+		log.Error(
+			"Failed to get the repository's HEAD",
+			map[string]interface{}{
+				"err": err,
+			},
+		)
 		return nil, err
 	}
 	defer reference.Free()
@@ -322,17 +329,32 @@ func commitBlobs(
 		&pack,
 	)
 	if err != nil {
-		log.Error("Failed to push blobs", "err", err)
+		log.Error(
+			"Failed to push blobs",
+			map[string]interface{}{
+				"err": err,
+			},
+		)
 		return nil, err
 	}
 	if unpackErr != nil {
-		log.Error("Failed to unpack packfile", "err", unpackErr)
+		log.Error(
+			"Failed to unpack packfile",
+			map[string]interface{}{
+				"err": unpackErr,
+			},
+		)
 		return nil, err
 	}
 
 	updatedFiles, err := gitserver.GetUpdatedFiles(ctx, repo, updatedRefs)
 	if err != nil {
-		log.Error("failed to get updated files", "err", err)
+		log.Error(
+			"failed to get updated files",
+			map[string]interface{}{
+				"err": err,
+			},
+		)
 	}
 	return &gitserver.UpdateResult{
 		Status:       "ok",
@@ -343,18 +365,21 @@ func commitBlobs(
 
 func main() {
 	flag.Parse()
-	log := base.StderrLog(false)
+	log, err := log15.New("info", false)
+	if err != nil {
+		panic(err)
+	}
 
 	if *author == "" {
-		log.Crit("author cannot be empty. Please specify one with -author")
+		log.Error("author cannot be empty. Please specify one with -author", nil)
 		os.Exit(1)
 	}
 	if *commitMessage == "" {
-		log.Crit("commit message cannot be empty. Please specify one with -commit-message")
+		log.Error("commit message cannot be empty. Please specify one with -commit-message", nil)
 		os.Exit(1)
 	}
 	if *repositoryPath == "" {
-		log.Crit("repository path cannot be empty. Please specify one with -repository-path")
+		log.Error("repository path cannot be empty. Please specify one with -repository-path", nil)
 		os.Exit(1)
 	}
 
@@ -364,19 +389,34 @@ func main() {
 	if _, err := os.Stat(*repositoryPath); os.IsNotExist(err) {
 		dir, err := ioutil.TempDir(filepath.Dir(*repositoryPath), "repository")
 		if err != nil {
-			log.Crit("Failed to create temporary directory", "err", err)
+			log.Error(
+				"Failed to create temporary directory",
+				map[string]interface{}{
+					"err": err,
+				},
+			)
 			os.Exit(1)
 		}
 		defer os.RemoveAll(dir)
 
 		if err := os.Chmod(dir, 0755); err != nil {
-			log.Crit("Failed to chmod temporary directory", "err", err)
+			log.Error(
+				"Failed to chmod temporary directory",
+				map[string]interface{}{
+					"err": err,
+				},
+			)
 			os.Exit(1)
 		}
 
 		repo, err = gitserver.InitRepository(ctx, dir)
 		if err != nil {
-			log.Crit("Failed to init bare repository", "err", err)
+			log.Error(
+				"Failed to init bare repository",
+				map[string]interface{}{
+					"err": err,
+				},
+			)
 			os.Exit(1)
 		}
 		commitCallback = func() error {
@@ -395,7 +435,12 @@ func main() {
 		}
 		repo, err = git.OpenRepository(*repositoryPath)
 		if err != nil {
-			log.Crit("failed to open existing repository", "err", err)
+			log.Error(
+				"failed to open existing repository",
+				map[string]interface{}{
+					"err": err,
+				},
+			)
 			os.Exit(1)
 		}
 	}
@@ -403,9 +448,19 @@ func main() {
 
 	lockfile := githttp.NewLockfile(repo.Path())
 	if ok, err := lockfile.TryLock(); !ok {
-		log.Info("Waiting for the lockfile", "err", err)
+		log.Info(
+			"Waiting for the lockfile",
+			map[string]interface{}{
+				"err": err,
+			},
+		)
 		if err := lockfile.Lock(); err != nil {
-			log.Crit("Failed to acquire the lockfile", "err", err)
+			log.Error(
+				"Failed to acquire the lockfile",
+				map[string]interface{}{
+					"err": err,
+				},
+			)
 			os.Exit(1)
 		}
 	}
@@ -415,7 +470,12 @@ func main() {
 	if *problemSettingsJSON != "" {
 		problemSettings = &common.ProblemSettings{}
 		if err := json.Unmarshal([]byte(*problemSettingsJSON), problemSettings); err != nil {
-			log.Crit("Failed to parse -problem-settings", "err", err)
+			log.Error(
+				"Failed to parse -problem-settings",
+				map[string]interface{}{
+					"err": err,
+				},
+			)
 			os.Exit(1)
 		}
 	}
@@ -424,13 +484,23 @@ func main() {
 	if *zipPath != "" {
 		zipMergeStrategy, err := gitserver.ParseZipMergeStrategy(*mergeStrategyName)
 		if err != nil {
-			log.Crit("Invalid value for -merge-strategy: %q", *mergeStrategyName)
+			log.Error(
+				"Invalid value for -merge-strategy",
+				map[string]interface{}{
+					"strategy": *mergeStrategyName,
+				},
+			)
 			os.Exit(1)
 		}
 
 		zipReader, err := zip.OpenReader(*zipPath)
 		if err != nil {
-			log.Crit("Failed to open the zip file", "err", err)
+			log.Error(
+				"Failed to open the zip file",
+				map[string]interface{}{
+					"err": err,
+				},
+			)
 			os.Exit(1)
 		}
 		defer zipReader.Close()
@@ -448,13 +518,24 @@ func main() {
 			log,
 		)
 		if err != nil {
-			log.Error("Failed update the repository", "path", *repositoryPath, "err", err)
+			log.Error(
+				"Failed update the repository",
+				map[string]interface{}{
+					"path": *repositoryPath,
+					"err":  err,
+				},
+			)
 			updateResult = &gitserver.UpdateResult{
 				Status: "error",
 				Error:  err.Error(),
 			}
 		} else if err := commitCallback(); err != nil {
-			log.Error("Failed to commit the write to the repository", "err", err)
+			log.Error(
+				"Failed to commit the write to the repository",
+				map[string]interface{}{
+					"err": err,
+				},
+			)
 			updateResult = &gitserver.UpdateResult{
 				Status: "error",
 				Error:  err.Error(),
@@ -463,7 +544,12 @@ func main() {
 	} else if *blobUpdateJSON != "" {
 		var blobUpdates []BlobUpdate
 		if err := json.Unmarshal([]byte(*blobUpdateJSON), &blobUpdates); err != nil {
-			log.Crit("Failed to parse -blob-update", "err", err)
+			log.Error(
+				"Failed to parse -blob-update",
+				map[string]interface{}{
+					"err": err,
+				},
+			)
 			os.Exit(1)
 		}
 
@@ -471,9 +557,12 @@ func main() {
 		for _, blobUpdate := range blobUpdates {
 			f, err := os.Open(blobUpdate.ContentsPath)
 			if err != nil {
-				log.Crit("failed to open blob contents",
-					"contents path", blobUpdate.ContentsPath,
-					"path", blobUpdate.Path,
+				log.Error(
+					"failed to open blob contents",
+					map[string]interface{}{
+						"contents path": blobUpdate.ContentsPath,
+						"path":          blobUpdate.Path,
+					},
 				)
 				os.Exit(1)
 			}
@@ -491,7 +580,13 @@ func main() {
 			log,
 		)
 		if err != nil {
-			log.Error("Failed update the repository", "path", *repositoryPath, "err", err)
+			log.Error(
+				"Failed update the repository",
+				map[string]interface{}{
+					"path": *repositoryPath,
+					"err":  err,
+				},
+			)
 			updateResult = &gitserver.UpdateResult{
 				Status: "error",
 				Error:  err.Error(),
@@ -501,7 +596,12 @@ func main() {
 		var err error
 		zipReader, err := zip.NewReader(bytes.NewReader(emptyZipFile), int64(len(emptyZipFile)))
 		if err != nil {
-			log.Crit("Failed to open the empty zip file", "err", err)
+			log.Error(
+				"Failed to open the empty zip file",
+				map[string]interface{}{
+					"err": err,
+				},
+			)
 			os.Exit(1)
 		}
 
@@ -518,14 +618,20 @@ func main() {
 			log,
 		)
 		if err != nil {
-			log.Error("Failed update the repository", "path", *repositoryPath, "err", err)
+			log.Error(
+				"Failed update the repository",
+				map[string]interface{}{
+					"path": *repositoryPath,
+					"err":  err,
+				},
+			)
 			updateResult = &gitserver.UpdateResult{
 				Status: "error",
 				Error:  err.Error(),
 			}
 		}
 	} else {
-		log.Error("-zip-path, -blob-update, and -problem-settings cannot be simultaneously empty.")
+		log.Error("-zip-path, -blob-update, and -problem-settings cannot be simultaneously empty.", nil)
 		os.Exit(1)
 	}
 

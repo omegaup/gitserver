@@ -10,13 +10,16 @@ import (
 	"os"
 	"path"
 	"strings"
+	"time"
 
-	"github.com/inconshreveable/log15"
-	git "github.com/libgit2/git2go/v33"
 	"github.com/omegaup/githttp/v2"
 	"github.com/omegaup/gitserver"
 	"github.com/omegaup/gitserver/request"
-	base "github.com/omegaup/go-base/v2"
+	"github.com/omegaup/go-base/logging/log15"
+	base "github.com/omegaup/go-base/v3"
+	"github.com/omegaup/go-base/v3/logging"
+
+	git "github.com/libgit2/git2go/v33"
 	"github.com/pkg/errors"
 )
 
@@ -30,6 +33,11 @@ var (
 		"ignore-committer",
 		false,
 		"ignore the committer and use the author instead",
+	)
+	ignoreTimeLimit = flag.Bool(
+		"ignore-time-limit",
+		false,
+		"ignore the hard wall time limit",
 	)
 )
 
@@ -62,7 +70,7 @@ func createPackfileFromSplitCommit(
 	sourceRepo, destRepo *git.Repository,
 	commit *git.Commit,
 	publishedID *git.Oid,
-	log log15.Logger,
+	log logging.Logger,
 ) error {
 	// Create the new commit object and add it to a packfile builder.
 	head, err := destRepo.Head()
@@ -170,7 +178,7 @@ func createPackfileFromSplitCommit(
 	return nil
 }
 
-func mergeRepository(sourceRepositoryPath, destRepositoryPath string, log log15.Logger) error {
+func mergeRepository(sourceRepositoryPath, destRepositoryPath string, log logging.Logger) error {
 	sourceRepo, err := git.OpenRepository(sourceRepositoryPath)
 	if err != nil {
 		return errors.Wrapf(
@@ -258,7 +266,13 @@ func mergeRepository(sourceRepositoryPath, destRepositoryPath string, log log15.
 			}
 			commits = append(commits, commit)
 
-			log.Info("commit", "id", commit.Id().String(), "parents", commit.ParentCount())
+			log.Info(
+				"commit",
+				map[string]interface{}{
+					"id":      commit.Id().String(),
+					"parents": commit.ParentCount(),
+				},
+			)
 			commit = commit.Parent(0)
 			defer commit.Free()
 
@@ -303,7 +317,7 @@ func createPackfileFromMergedCommit(
 	sourceRepo, destRepo *git.Repository,
 	commit *git.Commit,
 	ignoreCommitter bool,
-	log log15.Logger,
+	log logging.Logger,
 ) ([]*unmergeResult, error) {
 	// Create the new commit object and add it to a packfile builder.
 	head, err := destRepo.Head()
@@ -367,12 +381,17 @@ func createPackfileFromMergedCommit(
 	lockfile := githttp.NewLockfile(destRepo.Path())
 	defer lockfile.Unlock()
 
+	overallWallTimeHardLimit := gitserver.OverallWallTimeHardLimit
+	if *ignoreTimeLimit {
+		overallWallTimeHardLimit = base.Duration(time.Duration(int64(^uint64(0) >> 1)))
+	}
+
 	protocol := gitserver.NewGitProtocol(gitserver.GitProtocolOpts{
 		GitProtocolOpts: githttp.GitProtocolOpts{
 			Log: log,
 		},
 		AllowDirectPushToMaster:  true,
-		HardOverallWallTimeLimit: gitserver.OverallWallTimeHardLimit,
+		HardOverallWallTimeLimit: overallWallTimeHardLimit,
 		InteractiveSettingsCompiler: &gitserver.LibinteractiveCompiler{
 			LibinteractiveJarPath: "/usr/share/java/libinteractive.jar",
 			Log:                   log,
@@ -457,7 +476,7 @@ func unmergeRepository(
 	sourceRepositoryPath,
 	destRepositoryPath string,
 	ignoreCommitter bool,
-	log log15.Logger,
+	log logging.Logger,
 ) (*unmergeReport, error) {
 	sourceRepo, err := git.OpenRepository(sourceRepositoryPath)
 	if err != nil {
@@ -599,7 +618,10 @@ func main() {
 	defer git.Shutdown()
 
 	flag.Parse()
-	log := base.StderrLog(false)
+	log, err := log15.New("info", false)
+	if err != nil {
+		panic(err)
+	}
 
 	args := flag.Args()
 	if len(args) != 3 {
@@ -614,9 +636,11 @@ func main() {
 
 	if operation == "merge" {
 		if err := mergeRepository(sourceRepositoryPath, destRepositoryPath, log); err != nil {
-			log.Crit(
+			log.Error(
 				"failed to merge repository",
-				"err", err,
+				map[string]interface{}{
+					"err": err,
+				},
 			)
 			os.Exit(1)
 		}
@@ -628,10 +652,12 @@ func main() {
 
 		f, err := os.Create(*reportPath)
 		if err != nil {
-			log.Crit(
+			log.Error(
 				"failed to create report JSON file",
-				"path", *reportPath,
-				"err", err,
+				map[string]interface{}{
+					"path": *reportPath,
+					"err":  err,
+				},
 			)
 			os.Exit(1)
 		}
@@ -639,9 +665,11 @@ func main() {
 
 		report, err := unmergeRepository(ctx, sourceRepositoryPath, destRepositoryPath, *ignoreCommitter, log)
 		if err != nil {
-			log.Crit(
+			log.Error(
 				"failed to unmerge repository",
-				"err", err,
+				map[string]interface{}{
+					"err": err,
+				},
 			)
 			os.Exit(1)
 		}
@@ -649,17 +677,21 @@ func main() {
 		encoder := json.NewEncoder(f)
 		encoder.SetIndent("", "  ")
 		if err := encoder.Encode(report); err != nil {
-			log.Crit(
+			log.Error(
 				"failed to marshal report",
-				"path", *reportPath,
-				"err", err,
+				map[string]interface{}{
+					"path": *reportPath,
+					"err":  err,
+				},
 			)
 			os.Exit(1)
 		}
 	} else {
-		log.Crit(
+		log.Error(
 			"unrecognized operation",
-			"operation", operation,
+			map[string]interface{}{
+				"operation": operation,
+			},
 		)
 		os.Exit(1)
 	}
