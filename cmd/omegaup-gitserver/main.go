@@ -99,7 +99,10 @@ func muxHandler(
 		Log:      log,
 		Tracing:  tracing,
 	}))
-	_, wrappedHealthHandler := tracing.WrapHandle("/health", gitserver.HealthHandler(port))
+	_, wrappedHealthHandler := tracing.WrapHandle("/health", gitserver.HealthHandler(
+		rootPath,
+		port,
+	))
 	_, wrappedMetricsHandler := tracing.WrapHandle("/metrics", metricsHandler)
 	return &muxGitHandler{
 		log:            log,
