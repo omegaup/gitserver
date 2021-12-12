@@ -1,15 +1,13 @@
 package main
 
 import (
-	"context"
 	"errors"
 	"io"
 	"io/ioutil"
 	"net"
+	"net/http"
 	"net/http/httptest"
 	"os"
-	"path"
-	"strconv"
 	"testing"
 
 	"github.com/omegaup/githttp/v2"
@@ -33,38 +31,30 @@ func TestHealth(t *testing.T) {
 		defer os.RemoveAll(tmpDir)
 	}
 
-	ctx := context.Background()
-
 	log, err := log15.New("info", false)
 	if err != nil {
 		t.Fatalf("Failed to create log: %v", err)
 	}
+	config := &Config{
+		Gitserver: GitserverConfig{
+			AllowDirectPushToMaster: true,
+		},
+	}
+	authCallback := omegaupAuthorization{
+		log:    log,
+		config: config,
+	}
 	ts := httptest.NewUnstartedServer(nil)
-	_, portString, err := net.SplitHostPort(ts.Listener.Addr().String())
-	if err != nil {
-		t.Fatalf("port: %v", err)
-	}
-	port, err := strconv.ParseInt(portString, 10, 32)
-	if err != nil {
-		t.Fatalf("parse port: %v", err)
-	}
-
-	config := DefaultConfig()
-	config.Gitserver.Port = uint16(port)
-	authorize, err := createAuthorizationCallback(&config, log)
-	if err != nil {
-		t.Fatalf("authorization callback: %v", err)
-	}
-
 	ts.Config.Handler = muxHandler(
 		nil,
-		config.Gitserver.Port,
+		uint16(ts.Listener.Addr().(*net.TCPAddr).Port),
 		tmpDir,
 		gitserver.NewGitProtocol(gitserver.GitProtocolOpts{
 			GitProtocolOpts: githttp.GitProtocolOpts{
-				AuthCallback: authorize,
+				AuthCallback: authCallback.authorize,
 				Log:          log,
 			},
+			AllowDirectPushToMaster:     config.Gitserver.AllowDirectPushToMaster,
 			HardOverallWallTimeLimit:    gitserver.OverallWallTimeHardLimit,
 			InteractiveSettingsCompiler: fakeInteractiveSettingsCompiler,
 		}),
@@ -73,27 +63,28 @@ func TestHealth(t *testing.T) {
 	ts.Start()
 	defer ts.Close()
 
-	problemAlias := "sumas"
-
-	repo, err := gitserver.InitRepository(ctx, path.Join(tmpDir, problemAlias))
+	res, err := ts.Client().Get(ts.URL + "/health/live")
 	if err != nil {
-		t.Fatalf("Failed to initialize git repository: %v", err)
+		t.Fatalf("Failed to create pre-pull request: %v", err)
 	}
-	defer repo.Free()
+	res.Body.Close()
+	if res.StatusCode != http.StatusOK {
+		t.Fatalf("/health/live failed. status: %v, headers: %v", res.StatusCode, res.Header)
+	}
 
-	for _, path := range []string{"/health/live", "/health/ready"} {
-		path := path
-		t.Run(path, func(t *testing.T) {
-			res, err := ts.Client().Get(ts.URL + path)
-			if err != nil {
-				t.Fatalf("get: %v", err)
-			}
-			defer res.Body.Close()
-
-			if res.StatusCode != 200 {
-				body, _ := io.ReadAll(res.Body)
-				t.Fatalf("health check failure: HTTP %d: %v", res.StatusCode, string(body))
-			}
-		})
+	// Run this twice because the first attempt will create the problem.
+	for i := 0; i < 2; i++ {
+		res, err = ts.Client().Get(ts.URL + "/health/ready")
+		if err != nil {
+			t.Fatalf("Failed to create pre-pull request: %v", err)
+		}
+		contents, err := io.ReadAll(res.Body)
+		if err != nil {
+			t.Fatalf("Failed to read response: %v", err)
+		}
+		res.Body.Close()
+		if res.StatusCode != http.StatusOK {
+			t.Fatalf("/health/ready failed. status: %v, headers: %v, body: %v", res.StatusCode, res.Header, string(contents))
+		}
 	}
 }

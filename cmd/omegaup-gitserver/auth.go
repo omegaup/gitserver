@@ -384,9 +384,10 @@ func (a *omegaupAuthorization) authorize(
 	requestContext := request.FromContext(ctx)
 	requestContext.Request.ProblemName = problem
 	requestContext.Request.Username = username
-	if username == "omegaup:health" && isLocalRequest {
-		// This is a legit health check, so we grant reading privileges.
+	if username == "omegaup:health" && requestContext.Request.ProblemName == ":testproblem" && isLocalRequest {
+		// This is a legit health check, so we grant privileges to the test problem.
 		requestContext.Request.CanView = true
+		requestContext.Request.CanEdit = true
 	} else if username == "omegaup:system" || *insecureSkipAuthorization {
 		// This is the frontend, and we trust it completely.
 		requestContext.Request.IsSystem = true
