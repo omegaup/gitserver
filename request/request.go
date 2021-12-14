@@ -14,15 +14,16 @@ const requestContextKey key = 0
 // Request stores the request-specific part of the Context, to make it easier
 // to serialize.
 type Request struct {
-	ProblemName string
-	Username    string
-	Create      bool
-	IsSystem    bool
-	IsAdmin     bool
-	CanView     bool
-	CanEdit     bool
-	HasSolved   bool
-	ReviewRef   string
+	ProblemName    string
+	Username       string
+	Create         bool
+	IsSystem       bool
+	IsAdmin        bool
+	CanView        bool
+	CanViewAllRefs bool
+	CanEdit        bool
+	HasSolved      bool
+	ReviewRef      string
 }
 
 // Context stores a few variables that are request-specific.
