@@ -49,7 +49,7 @@ func referenceDiscovery(
 	referenceName string,
 ) bool {
 	requestContext := request.FromContext(ctx)
-	if requestContext.Request.CanEdit {
+	if requestContext.Request.CanViewAllRefs {
 		return true
 	}
 	if requestContext.Request.HasSolved {

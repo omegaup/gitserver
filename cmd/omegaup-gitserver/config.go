@@ -37,6 +37,10 @@ type GitserverConfig struct {
 	// authenticate instead of using PKI, in both directions.
 	SecretToken string
 
+	// GraderSecretToken is a shared secret with the grader that can be used to
+	// authenticate instead of using PKI, in both directions.
+	GraderSecretToken string
+
 	// AllowSecretTokenAuthentication controls whether the SecretToken can be
 	// used to authenticate incoming requests, instead of just being used for
 	// outgoing requests towards the frontend.
@@ -84,6 +88,7 @@ var defaultConfig = Config{
 		RootPath:                               "/var/lib/omegaup/problems.git",
 		PublicKey:                              "gKEg5JlIOA1BsIxETZYhjd+ZGchY/rZeQM0GheAWvXw=",
 		SecretToken:                            "",
+		GraderSecretToken:                      "",
 		Port:                                   33861,
 		PprofPort:                              33862,
 		LibinteractivePath:                     "/usr/share/java/libinteractive.jar",

@@ -142,8 +142,8 @@ func (a *omegaupAuthorization) parseUsernameAndPassword(
 		return
 	}
 
-	if username == "omegaup:system" {
-		// omegaup:system can only log in using the auth token or the secret token.
+	if strings.HasPrefix(username, "omegaup:") {
+		// omegaup:system and friends can only log in using the auth token or the secret token.
 		a.log.Error(
 			"user tried to login with restricted user",
 			map[string]interface{}{
@@ -231,13 +231,15 @@ func (a *omegaupAuthorization) parseAuthorizationHeader(
 		}
 	}
 
-	if a.config.Gitserver.AllowSecretTokenAuthentication && a.config.Gitserver.SecretToken != "" {
-		if strings.EqualFold(tokens[0], omegaUpSharedSecretAuthenticationScheme) {
+	if a.config.Gitserver.AllowSecretTokenAuthentication &&
+		strings.EqualFold(tokens[0], omegaUpSharedSecretAuthenticationScheme) {
+		if a.config.Gitserver.SecretToken != "" || a.config.Gitserver.GraderSecretToken != "" {
 			if len(tokens) != 3 {
 				return
 			}
 
-			if tokens[1] != a.config.Gitserver.SecretToken {
+			if (tokens[1] != a.config.Gitserver.SecretToken) &&
+				(tokens[1] != a.config.Gitserver.GraderSecretToken || tokens[2] != "omegaup:grader") {
 				return
 			}
 
@@ -388,18 +390,25 @@ func (a *omegaupAuthorization) authorize(
 		// This is a legit health check, so we grant privileges to the test problem.
 		requestContext.Request.CanView = true
 		requestContext.Request.CanEdit = true
+		requestContext.Request.CanViewAllRefs = true
+	} else if username == "omegaup:grader" || *insecureSkipAuthorization {
+		// This is the grader, it has read-only privileges for all problems.
+		requestContext.Request.CanView = true
+		requestContext.Request.CanViewAllRefs = true
 	} else if username == "omegaup:system" || *insecureSkipAuthorization {
 		// This is the frontend, and we trust it completely.
 		requestContext.Request.IsSystem = true
 		requestContext.Request.IsAdmin = true
 		requestContext.Request.CanView = true
 		requestContext.Request.CanEdit = true
+		requestContext.Request.CanViewAllRefs = true
 	} else if requestContext.Request.Create {
 		// This is a repository creation request. There is nothing in the database
 		// yet, so grant them all privileges.
 		requestContext.Request.IsAdmin = true
 		requestContext.Request.CanView = true
 		requestContext.Request.CanEdit = true
+		requestContext.Request.CanViewAllRefs = true
 	} else {
 		auth, err := a.getAuthorizationFromFrontend(
 			username,
@@ -421,6 +430,7 @@ func (a *omegaupAuthorization) authorize(
 		requestContext.Request.IsAdmin = auth.IsAdmin
 		requestContext.Request.CanView = auth.CanView
 		requestContext.Request.CanEdit = auth.CanEdit
+		requestContext.Request.CanViewAllRefs = auth.CanEdit
 	}
 	a.log.Info(
 		"Auth",
