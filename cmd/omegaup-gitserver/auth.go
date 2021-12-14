@@ -238,8 +238,8 @@ func (a *omegaupAuthorization) parseAuthorizationHeader(
 				return
 			}
 
-			if (tokens[1] != a.config.Gitserver.SecretToken) &&
-				(tokens[1] != a.config.Gitserver.GraderSecretToken || tokens[2] != "omegaup:grader") {
+			if (a.config.Gitserver.SecretToken == "" || tokens[1] != a.config.Gitserver.SecretToken) &&
+				(a.config.Gitserver.GraderSecretToken == "" || tokens[1] != a.config.Gitserver.GraderSecretToken || tokens[2] != "omegaup:grader") {
 				return
 			}
 
