@@ -631,7 +631,7 @@ func CreatePackfile(
 	for topLevelComponent, files := range trees {
 		log.Debug(
 			"Building top-level tree",
-			map[string]interface{}{
+			map[string]any{
 				"name":  topLevelComponent,
 				"files": files,
 			},
@@ -665,7 +665,7 @@ func CreatePackfile(
 	for topLevelComponent, oid := range topLevelEntries {
 		log.Debug(
 			"Adding top-level file",
-			map[string]interface{}{
+			map[string]any{
 				"name": topLevelComponent,
 				"id":   oid.String(),
 			},
@@ -786,7 +786,7 @@ func CreatePackfile(
 
 	log.Debug(
 		"Final tree created",
-		map[string]interface{}{
+		map[string]any{
 			"id": treeID.String(),
 		},
 	)
@@ -1010,7 +1010,7 @@ func ConvertZipToPackfile(
 			if !isValidFile {
 				log.Info(
 					"Skipping file",
-					map[string]interface{}{
+					map[string]any{
 						"path": zipfilePath,
 					},
 				)
@@ -1121,7 +1121,7 @@ func ConvertZipToPackfile(
 
 	log.Info(
 		"Zip is valid",
-		map[string]interface{}{
+		map[string]any{
 			"Files": problemFiles.Files(),
 		},
 	)
@@ -1326,7 +1326,7 @@ func (h *zipUploadHandler) handleGitUploadZip(
 		if err := r.ParseMultipartForm((32 * base.Mebibyte).Bytes()); err != nil {
 			log.Error(
 				"Unable to parse multipart form",
-				map[string]interface{}{
+				map[string]any{
 					"err": err,
 				},
 			)
@@ -1342,7 +1342,7 @@ func (h *zipUploadHandler) handleGitUploadZip(
 		if err != nil {
 			log.Error(
 				"Invalid contents",
-				map[string]interface{}{
+				map[string]any{
 					"err": err,
 				},
 			)
@@ -1362,7 +1362,7 @@ func (h *zipUploadHandler) handleGitUploadZip(
 	} else {
 		log.Error(
 			"Bad content type",
-			map[string]interface{}{
+			map[string]any{
 				"Content-Type": r.Header.Get("Content-Type"),
 			},
 		)
@@ -1382,7 +1382,7 @@ func (h *zipUploadHandler) handleGitUploadZip(
 		if err := json.Unmarshal([]byte(paramValue("settings")), &unmarshaledSettings); err != nil {
 			log.Error(
 				"invalid settings",
-				map[string]interface{}{
+				map[string]any{
 					"err": err,
 				},
 			)
@@ -1399,7 +1399,7 @@ func (h *zipUploadHandler) handleGitUploadZip(
 	if err != nil {
 		log.Error(
 			"invalid merge strategy",
-			map[string]interface{}{
+			map[string]any{
 				"mergeStrategy": paramValue("mergeStrategy"),
 			},
 		)
@@ -1414,7 +1414,7 @@ func (h *zipUploadHandler) handleGitUploadZip(
 	repositoryPath := path.Join(h.rootPath, repositoryName)
 	log.Info(
 		"git-upload-zip",
-		map[string]interface{}{
+		map[string]any{
 			"path":   repositoryPath,
 			"create": requestContext.Request.Create,
 		},
@@ -1423,7 +1423,7 @@ func (h *zipUploadHandler) handleGitUploadZip(
 		if requestContext.Request.Create {
 			log.Error(
 				"Creating on top of an existing directory",
-				map[string]interface{}{
+				map[string]any{
 					"path": repositoryPath,
 				},
 			)
@@ -1431,7 +1431,7 @@ func (h *zipUploadHandler) handleGitUploadZip(
 		} else {
 			log.Error(
 				"Updating a missing directory",
-				map[string]interface{}{
+				map[string]any{
 					"path": repositoryPath,
 				},
 			)
@@ -1456,7 +1456,7 @@ func (h *zipUploadHandler) handleGitUploadZip(
 	if err != nil {
 		log.Error(
 			"failed to copy zip",
-			map[string]interface{}{
+			map[string]any{
 				"err":     err,
 				"zipSize": zipSize,
 			},
@@ -1472,7 +1472,7 @@ func (h *zipUploadHandler) handleGitUploadZip(
 	if err != nil {
 		log.Error(
 			"failed to read zip",
-			map[string]interface{}{
+			map[string]any{
 				"err": err,
 			},
 		)
@@ -1498,7 +1498,7 @@ func (h *zipUploadHandler) handleGitUploadZip(
 		if err != nil {
 			log.Error(
 				"Failed to create temporary directory",
-				map[string]interface{}{
+				map[string]any{
 					"err": err,
 				},
 			)
@@ -1511,7 +1511,7 @@ func (h *zipUploadHandler) handleGitUploadZip(
 		if err := os.Chmod(dir, 0755); err != nil {
 			log.Error(
 				"Failed to chmod temporary directory",
-				map[string]interface{}{
+				map[string]any{
 					"err": err,
 				},
 			)
@@ -1524,7 +1524,7 @@ func (h *zipUploadHandler) handleGitUploadZip(
 		if err != nil {
 			log.Error(
 				"failed to init repository",
-				map[string]interface{}{
+				map[string]any{
 					"err": err,
 				},
 			)
@@ -1540,7 +1540,7 @@ func (h *zipUploadHandler) handleGitUploadZip(
 		if err != nil {
 			log.Error(
 				"failed to open repository",
-				map[string]interface{}{
+				map[string]any{
 					"err": err,
 				},
 			)
@@ -1557,7 +1557,7 @@ func (h *zipUploadHandler) handleGitUploadZip(
 	if ok, err := lockfile.TryRLock(); !ok {
 		log.Info(
 			"Waiting for the lockfile",
-			map[string]interface{}{
+			map[string]any{
 				"err": err,
 			},
 		)
@@ -1566,7 +1566,7 @@ func (h *zipUploadHandler) handleGitUploadZip(
 		if err != nil {
 			log.Error(
 				"Failed to acquire the lockfile",
-				map[string]interface{}{
+				map[string]any{
 					"err": err,
 				},
 			)
@@ -1601,7 +1601,7 @@ func (h *zipUploadHandler) handleGitUploadZip(
 	if err != nil {
 		log.Error(
 			"push failed",
-			map[string]interface{}{
+			map[string]any{
 				"path": repositoryPath,
 				"err":  err,
 			},
@@ -1616,7 +1616,7 @@ func (h *zipUploadHandler) handleGitUploadZip(
 		if err := commitCallback(); err != nil {
 			log.Info(
 				"push successful, but commit failed",
-				map[string]interface{}{
+				map[string]any{
 					"path":   repositoryPath,
 					"result": updateResult,
 					"err":    err,
@@ -1627,7 +1627,7 @@ func (h *zipUploadHandler) handleGitUploadZip(
 		}
 		log.Info(
 			"push successful",
-			map[string]interface{}{
+			map[string]any{
 				"path":   repositoryPath,
 				"result": updateResult,
 			},
@@ -1658,7 +1658,7 @@ func (h *zipUploadHandler) handleRenameRepository(
 	targetRepositoryPath := path.Join(h.rootPath, targetRepositoryName)
 	log.Info(
 		"rename-repository",
-		map[string]interface{}{
+		map[string]any{
 			"path":        repositoryPath,
 			"target path": targetRepositoryPath,
 		},
@@ -1669,7 +1669,7 @@ func (h *zipUploadHandler) handleRenameRepository(
 	if level != githttp.AuthorizationAllowed || !requestContext.Request.IsSystem {
 		log.Error(
 			"not allowed to rename repository",
-			map[string]interface{}{
+			map[string]any{
 				"authorization level": level,
 				"request context":     requestContext.Request,
 			},
@@ -1681,7 +1681,7 @@ func (h *zipUploadHandler) handleRenameRepository(
 	if err := os.Rename(repositoryPath, targetRepositoryPath); err != nil {
 		log.Error(
 			"failed to rename repository",
-			map[string]interface{}{
+			map[string]any{
 				"err": err,
 			},
 		)
@@ -1698,7 +1698,7 @@ func (h *zipUploadHandler) handleRenameRepository(
 
 	log.Info(
 		"rename successful",
-		map[string]interface{}{
+		map[string]any{
 			"path":        repositoryPath,
 			"target path": targetRepositoryPath,
 		},
@@ -1737,7 +1737,7 @@ func (h *zipUploadHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	log.Error(
 		"failed to rename repository",
-		map[string]interface{}{
+		map[string]any{
 			"split path": splitPath,
 		},
 	)

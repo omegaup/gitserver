@@ -20,7 +20,7 @@ import (
 
 	"github.com/omegaup/githttp/v2"
 	"github.com/omegaup/gitserver/gitservertest"
-	"github.com/omegaup/go-base/logging/log15"
+	"github.com/omegaup/go-base/logging/log15/v3"
 	base "github.com/omegaup/go-base/v3"
 	"github.com/omegaup/quark/common"
 

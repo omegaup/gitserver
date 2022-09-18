@@ -22,7 +22,7 @@ import (
 	"github.com/omegaup/githttp/v2"
 	"github.com/omegaup/gitserver/gitservertest"
 	"github.com/omegaup/gitserver/request"
-	"github.com/omegaup/go-base/logging/log15"
+	"github.com/omegaup/go-base/logging/log15/v3"
 	"github.com/omegaup/go-base/v3/logging"
 	"github.com/omegaup/quark/common"
 
@@ -1310,7 +1310,7 @@ func TestPushGitbomb(t *testing.T) {
 	for i := 0; i < 24; i++ {
 		log.Debug(
 			"Creating gitbomb",
-			map[string]interface{}{
+			map[string]any{
 				"iteration": i,
 			},
 		)

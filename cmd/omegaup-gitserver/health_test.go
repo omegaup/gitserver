@@ -12,7 +12,7 @@ import (
 
 	"github.com/omegaup/githttp/v2"
 	"github.com/omegaup/gitserver"
-	"github.com/omegaup/go-base/logging/log15"
+	"github.com/omegaup/go-base/logging/log15/v3"
 )
 
 var (

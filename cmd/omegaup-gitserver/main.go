@@ -16,8 +16,8 @@ import (
 	"github.com/omegaup/githttp/v2"
 	"github.com/omegaup/gitserver"
 	"github.com/omegaup/gitserver/request"
-	"github.com/omegaup/go-base/logging/log15"
-	nrtracing "github.com/omegaup/go-base/tracing/newrelic"
+	"github.com/omegaup/go-base/logging/log15/v3"
+	nrtracing "github.com/omegaup/go-base/tracing/newrelic/v3"
 	"github.com/omegaup/go-base/v3/logging"
 	"github.com/omegaup/go-base/v3/tracing"
 
@@ -179,7 +179,7 @@ func main() {
 	if err != nil {
 		log.Error(
 			"failed to create the authorization callback",
-			map[string]interface{}{
+			map[string]any{
 				"err": err,
 			},
 		)
@@ -225,7 +225,7 @@ func main() {
 		if err := gitServer.ListenAndServe(); err != http.ErrServerClosed {
 			log.Error(
 				"gitServer ListenAndServe",
-				map[string]interface{}{
+				map[string]any{
 					"err": err,
 				},
 			)
@@ -233,7 +233,7 @@ func main() {
 	}()
 	log.Info(
 		"omegaUp gitserver ready",
-		map[string]interface{}{
+		map[string]any{
 			"version": ProgramVersion,
 			"address": gitServer.Addr,
 		},
@@ -257,7 +257,7 @@ func main() {
 			if err := pprofServer.ListenAndServe(); err != http.ErrServerClosed {
 				log.Error(
 					"pprof ListenAndServe",
-					map[string]interface{}{
+					map[string]any{
 						"err": err,
 					},
 				)
@@ -265,7 +265,7 @@ func main() {
 		}()
 		log.Info(
 			"pprof server ready",
-			map[string]interface{}{
+			map[string]any{
 				"address": pprofServer.Addr,
 			},
 		)

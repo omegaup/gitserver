@@ -12,7 +12,7 @@ import (
 	"time"
 
 	"github.com/omegaup/githttp/v2"
-	"github.com/omegaup/go-base/logging/log15"
+	"github.com/omegaup/go-base/logging/log15/v3"
 	"github.com/omegaup/go-base/v3/logging"
 
 	git "github.com/libgit2/git2go/v33"
@@ -110,7 +110,7 @@ func forcePushToBranch(remote *url.URL) error {
 		if err != nil {
 			log.Error(
 				"Error discovering references",
-				map[string]interface{}{
+				map[string]any{
 					"err": err,
 				},
 			)
@@ -118,7 +118,7 @@ func forcePushToBranch(remote *url.URL) error {
 		}
 		log.Debug(
 			"Remote",
-			map[string]interface{}{
+			map[string]any{
 				"discovery": discovery,
 			},
 		)
@@ -136,7 +136,7 @@ func forcePushToBranch(remote *url.URL) error {
 			} else {
 				log.Error(
 					"Error getting descendantness",
-					map[string]interface{}{
+					map[string]any{
 						"err": err,
 					},
 				)
@@ -153,7 +153,7 @@ func forcePushToBranch(remote *url.URL) error {
 		)
 		log.Debug(
 			"Pushing",
-			map[string]interface{}{
+			map[string]any{
 				"oldOid": oldOid.String(),
 				"newOid": newOid.String(),
 				"line":   line,
@@ -162,7 +162,7 @@ func forcePushToBranch(remote *url.URL) error {
 		if err := pw.WritePktLine([]byte(line)); err != nil {
 			log.Error(
 				"Error sending pktline",
-				map[string]interface{}{
+				map[string]any{
 					"err": err,
 				},
 			)
@@ -171,7 +171,7 @@ func forcePushToBranch(remote *url.URL) error {
 		if err := pw.Flush(); err != nil {
 			log.Error(
 				"Error flushing",
-				map[string]interface{}{
+				map[string]any{
 					"err": err,
 				},
 			)
@@ -189,14 +189,14 @@ func forcePushToBranch(remote *url.URL) error {
 				}
 				log.Debug(
 					"Inserting commit",
-					map[string]interface{}{
+					map[string]any{
 						"commit": current.Id(),
 					},
 				)
 				if err := pb.InsertCommit(current.Id()); err != nil {
 					log.Error(
 						"Error building pack",
-						map[string]interface{}{
+						map[string]any{
 							"err": err,
 						},
 					)
@@ -208,7 +208,7 @@ func forcePushToBranch(remote *url.URL) error {
 		if err := pb.Write(stdin); err != nil {
 			log.Error(
 				"Error writing pack",
-				map[string]interface{}{
+				map[string]any{
 					"err": err,
 				},
 			)
@@ -222,7 +222,7 @@ func forcePushToBranch(remote *url.URL) error {
 			} else if err != nil {
 				log.Error(
 					"Error reading remote response",
-					map[string]interface{}{
+					map[string]any{
 						"err": err,
 					},
 				)
@@ -230,7 +230,7 @@ func forcePushToBranch(remote *url.URL) error {
 			}
 			log.Debug(
 				"Line",
-				map[string]interface{}{
+				map[string]any{
 					"line": string(line),
 				},
 			)
@@ -240,7 +240,7 @@ func forcePushToBranch(remote *url.URL) error {
 	cmd := fmt.Sprintf("git-receive-pack '%s'", remote.Path)
 	log.Info(
 		"Sending command",
-		map[string]interface{}{
+		map[string]any{
 			"command": cmd,
 		},
 	)
@@ -266,7 +266,7 @@ func pushToSubdirectory(remote *url.URL) error {
 	if err != nil {
 		log.Error(
 			"Could not create temporary directory for packfile",
-			map[string]interface{}{
+			map[string]any{
 				"err": err,
 			},
 		)
@@ -336,7 +336,7 @@ func pushToSubdirectory(remote *url.URL) error {
 		if err != nil {
 			log.Error(
 				"Error discovering references",
-				map[string]interface{}{
+				map[string]any{
 					"err": err,
 				},
 			)
@@ -344,7 +344,7 @@ func pushToSubdirectory(remote *url.URL) error {
 		}
 		log.Debug(
 			"Remote",
-			map[string]interface{}{
+			map[string]any{
 				"discovery": discovery,
 			},
 		)
@@ -353,14 +353,14 @@ func pushToSubdirectory(remote *url.URL) error {
 			line := fmt.Sprintf("want %s\x00agent=gohttp ofs-delta shallow\n", oid.String())
 			log.Debug(
 				"Pulling",
-				map[string]interface{}{
+				map[string]any{
 					"line": line,
 				},
 			)
 			if err := pw.WritePktLine([]byte(line)); err != nil {
 				log.Error(
 					"Error sending pktline",
-					map[string]interface{}{
+					map[string]any{
 						"err": err,
 					},
 				)
@@ -369,7 +369,7 @@ func pushToSubdirectory(remote *url.URL) error {
 			if err := pw.WritePktLine([]byte("deepen 1")); err != nil {
 				log.Error(
 					"Error sending pktline",
-					map[string]interface{}{
+					map[string]any{
 						"err": err,
 					},
 				)
@@ -378,7 +378,7 @@ func pushToSubdirectory(remote *url.URL) error {
 			if err := pw.Flush(); err != nil {
 				log.Error(
 					"Error flushing",
-					map[string]interface{}{
+					map[string]any{
 						"err": err,
 					},
 				)
@@ -394,7 +394,7 @@ func pushToSubdirectory(remote *url.URL) error {
 			} else if err != nil {
 				log.Error(
 					"Error reading shallow negotiation",
-					map[string]interface{}{
+					map[string]any{
 						"err": err,
 					},
 				)
@@ -402,7 +402,7 @@ func pushToSubdirectory(remote *url.URL) error {
 			}
 			log.Debug(
 				"Line",
-				map[string]interface{}{
+				map[string]any{
 					"line": string(line),
 				},
 			)
@@ -411,7 +411,7 @@ func pushToSubdirectory(remote *url.URL) error {
 		if err := pw.WritePktLine([]byte("done\n")); err != nil {
 			log.Error(
 				"Error sending pktline",
-				map[string]interface{}{
+				map[string]any{
 					"err": err,
 				},
 			)
@@ -423,7 +423,7 @@ func pushToSubdirectory(remote *url.URL) error {
 		if err != nil {
 			log.Error(
 				"Error reading ACK/NAK response",
-				map[string]interface{}{
+				map[string]any{
 					"err": err,
 				},
 			)
@@ -440,7 +440,7 @@ func pushToSubdirectory(remote *url.URL) error {
 		if err != nil {
 			log.Error(
 				"Error reading packfile",
-				map[string]interface{}{
+				map[string]any{
 					"err": err,
 				},
 			)
@@ -449,7 +449,7 @@ func pushToSubdirectory(remote *url.URL) error {
 
 		log.Info(
 			"Wrote packfile",
-			map[string]interface{}{
+			map[string]any{
 				"packPath": packPath,
 			},
 		)
@@ -458,7 +458,7 @@ func pushToSubdirectory(remote *url.URL) error {
 	cmd := fmt.Sprintf("git-upload-pack '%s'", remote.Path)
 	log.Info(
 		"Sending command",
-		map[string]interface{}{
+		map[string]any{
 			"command": cmd,
 		},
 	)
