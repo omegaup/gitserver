@@ -288,6 +288,8 @@ func TestInvalidRef(t *testing.T) {
 	if os.Getenv("PRESERVE") == "" {
 		defer os.RemoveAll(tmpDir)
 	}
+	m := githttp.NewLockfileManager()
+	defer m.Clear()
 	ctx := context.Background()
 
 	log, err := log15.New("info", false)
@@ -301,10 +303,12 @@ func TestInvalidRef(t *testing.T) {
 				AuthCallback: authorize,
 				Log:          log,
 			},
+			LockfileManager:             m,
 			HardOverallWallTimeLimit:    OverallWallTimeHardLimit,
 			InteractiveSettingsCompiler: fakeInteractiveSettingsCompiler,
 		}),
-		Log: log,
+		Log:             log,
+		LockfileManager: m,
 	}))
 	defer ts.Close()
 
@@ -370,6 +374,8 @@ func TestDelete(t *testing.T) {
 	if os.Getenv("PRESERVE") == "" {
 		defer os.RemoveAll(tmpDir)
 	}
+	m := githttp.NewLockfileManager()
+	defer m.Clear()
 	ctx := context.Background()
 
 	log, err := log15.New("info", false)
@@ -383,10 +389,12 @@ func TestDelete(t *testing.T) {
 				AuthCallback: authorize,
 				Log:          log,
 			},
+			LockfileManager:             m,
 			HardOverallWallTimeLimit:    OverallWallTimeHardLimit,
 			InteractiveSettingsCompiler: fakeInteractiveSettingsCompiler,
 		}),
-		Log: log,
+		Log:             log,
+		LockfileManager: m,
 	}))
 	defer ts.Close()
 
@@ -455,6 +463,8 @@ func TestServerCreateReview(t *testing.T) {
 	if os.Getenv("PRESERVE") == "" {
 		defer os.RemoveAll(tmpDir)
 	}
+	m := githttp.NewLockfileManager()
+	defer m.Clear()
 	ctx := context.Background()
 
 	log, err := log15.New("info", false)
@@ -468,10 +478,12 @@ func TestServerCreateReview(t *testing.T) {
 				AuthCallback: authorize,
 				Log:          log,
 			},
+			LockfileManager:             m,
 			HardOverallWallTimeLimit:    OverallWallTimeHardLimit,
 			InteractiveSettingsCompiler: fakeInteractiveSettingsCompiler,
 		}),
-		Log: log,
+		Log:             log,
+		LockfileManager: m,
 	}))
 	defer ts.Close()
 
@@ -1254,6 +1266,8 @@ func TestPushGitbomb(t *testing.T) {
 	if os.Getenv("PRESERVE") == "" {
 		defer os.RemoveAll(tmpDir)
 	}
+	m := githttp.NewLockfileManager()
+	defer m.Clear()
 	ctx := context.Background()
 
 	log, err := log15.New("info", false)
@@ -1267,10 +1281,12 @@ func TestPushGitbomb(t *testing.T) {
 				AuthCallback: authorize,
 				Log:          log,
 			},
+			LockfileManager:             m,
 			HardOverallWallTimeLimit:    OverallWallTimeHardLimit,
 			InteractiveSettingsCompiler: fakeInteractiveSettingsCompiler,
 		}),
-		Log: log,
+		Log:             log,
+		LockfileManager: m,
 	}))
 	defer ts.Close()
 
@@ -1386,6 +1402,8 @@ func TestConfig(t *testing.T) {
 	if os.Getenv("PRESERVE") == "" {
 		defer os.RemoveAll(tmpDir)
 	}
+	m := githttp.NewLockfileManager()
+	defer m.Clear()
 	ctx := context.Background()
 
 	log, err := log15.New("info", false)
@@ -1399,10 +1417,12 @@ func TestConfig(t *testing.T) {
 				AuthCallback: authorize,
 				Log:          log,
 			},
+			LockfileManager:             m,
 			HardOverallWallTimeLimit:    OverallWallTimeHardLimit,
 			InteractiveSettingsCompiler: fakeInteractiveSettingsCompiler,
 		}),
-		Log: log,
+		Log:             log,
+		LockfileManager: m,
 	}))
 	defer ts.Close()
 
@@ -1743,6 +1763,8 @@ func TestInteractive(t *testing.T) {
 	if os.Getenv("PRESERVE") == "" {
 		defer os.RemoveAll(tmpDir)
 	}
+	m := githttp.NewLockfileManager()
+	defer m.Clear()
 	ctx := context.Background()
 
 	log, err := log15.New("info", false)
@@ -1756,6 +1778,7 @@ func TestInteractive(t *testing.T) {
 				AuthCallback: authorize,
 				Log:          log,
 			},
+			LockfileManager:          m,
 			AllowDirectPushToMaster:  true,
 			HardOverallWallTimeLimit: OverallWallTimeHardLimit,
 			InteractiveSettingsCompiler: &FakeInteractiveSettingsCompiler{
@@ -1770,7 +1793,8 @@ func TestInteractive(t *testing.T) {
 				Err: nil,
 			},
 		}),
-		Log: log,
+		Log:             log,
+		LockfileManager: m,
 	}))
 	defer ts.Close()
 
@@ -1917,6 +1941,8 @@ func TestExampleCases(t *testing.T) {
 	if os.Getenv("PRESERVE") == "" {
 		defer os.RemoveAll(tmpDir)
 	}
+	m := githttp.NewLockfileManager()
+	defer m.Clear()
 	ctx := context.Background()
 
 	log, err := log15.New("info", false)
@@ -1930,11 +1956,13 @@ func TestExampleCases(t *testing.T) {
 				AuthCallback: authorize,
 				Log:          log,
 			},
+			LockfileManager:             m,
 			AllowDirectPushToMaster:     true,
 			HardOverallWallTimeLimit:    OverallWallTimeHardLimit,
 			InteractiveSettingsCompiler: fakeInteractiveSettingsCompiler,
 		}),
-		Log: log,
+		Log:             log,
+		LockfileManager: m,
 	}))
 	defer ts.Close()
 
@@ -2253,6 +2281,8 @@ func TestStatements(t *testing.T) {
 	if os.Getenv("PRESERVE") == "" {
 		defer os.RemoveAll(tmpDir)
 	}
+	m := githttp.NewLockfileManager()
+	defer m.Clear()
 	ctx := context.Background()
 
 	log, err := log15.New("info", false)
@@ -2266,11 +2296,13 @@ func TestStatements(t *testing.T) {
 				AuthCallback: authorize,
 				Log:          log,
 			},
+			LockfileManager:             m,
 			AllowDirectPushToMaster:     true,
 			HardOverallWallTimeLimit:    OverallWallTimeHardLimit,
 			InteractiveSettingsCompiler: fakeInteractiveSettingsCompiler,
 		}),
-		Log: log,
+		Log:             log,
+		LockfileManager: m,
 	}))
 	defer ts.Close()
 
@@ -2358,6 +2390,8 @@ func TestTests(t *testing.T) {
 	if os.Getenv("PRESERVE") == "" {
 		defer os.RemoveAll(tmpDir)
 	}
+	m := githttp.NewLockfileManager()
+	defer m.Clear()
 	ctx := context.Background()
 
 	log, err := log15.New("info", false)
@@ -2371,11 +2405,13 @@ func TestTests(t *testing.T) {
 				AuthCallback: authorize,
 				Log:          log,
 			},
+			LockfileManager:             m,
 			AllowDirectPushToMaster:     true,
 			HardOverallWallTimeLimit:    OverallWallTimeHardLimit,
 			InteractiveSettingsCompiler: fakeInteractiveSettingsCompiler,
 		}),
-		Log: log,
+		Log:             log,
+		LockfileManager: m,
 	}))
 	defer ts.Close()
 

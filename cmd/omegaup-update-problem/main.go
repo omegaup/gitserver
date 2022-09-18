@@ -56,6 +56,7 @@ type BlobUpdate struct {
 }
 
 func commitZipFile(
+	lockfileManager *githttp.LockfileManager,
 	problemFiles common.ProblemFiles,
 	repo *git.Repository,
 	lockfile *githttp.Lockfile,
@@ -79,6 +80,7 @@ func commitZipFile(
 		GitProtocolOpts: githttp.GitProtocolOpts{
 			Log: log,
 		},
+		LockfileManager:          lockfileManager,
 		AllowDirectPushToMaster:  true,
 		HardOverallWallTimeLimit: gitserver.OverallWallTimeHardLimit,
 		InteractiveSettingsCompiler: &gitserver.LibinteractiveCompiler{
@@ -254,6 +256,7 @@ func convertBlobsToPackfile(
 }
 
 func commitBlobs(
+	lockfileManager *githttp.LockfileManager,
 	repo *git.Repository,
 	lockfile *githttp.Lockfile,
 	authorUsername string,
@@ -307,6 +310,7 @@ func commitBlobs(
 		GitProtocolOpts: githttp.GitProtocolOpts{
 			Log: log,
 		},
+		LockfileManager:          lockfileManager,
 		AllowDirectPushToMaster:  true,
 		HardOverallWallTimeLimit: gitserver.OverallWallTimeHardLimit,
 		InteractiveSettingsCompiler: &gitserver.LibinteractiveCompiler{
@@ -446,7 +450,10 @@ func main() {
 	}
 	defer repo.Free()
 
-	lockfile := githttp.NewLockfile(repo.Path())
+	lockfileManager := githttp.NewLockfileManager()
+	defer lockfileManager.Clear()
+
+	lockfile := lockfileManager.NewLockfile(repo.Path())
 	if ok, err := lockfile.TryLock(); !ok {
 		log.Info(
 			"Waiting for the lockfile",
@@ -506,6 +513,7 @@ func main() {
 		defer zipReader.Close()
 
 		updateResult, err = commitZipFile(
+			lockfileManager,
 			common.NewProblemFilesFromZip(&zipReader.Reader, *zipPath),
 			repo,
 			lockfile,
@@ -572,6 +580,7 @@ func main() {
 
 		var err error
 		updateResult, err = commitBlobs(
+			lockfileManager,
 			repo,
 			lockfile,
 			*author,
@@ -606,6 +615,7 @@ func main() {
 		}
 
 		updateResult, err = commitZipFile(
+			lockfileManager,
 			common.NewProblemFilesFromZip(zipReader, ":memory:"),
 			repo,
 			lockfile,

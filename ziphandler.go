@@ -1301,11 +1301,12 @@ func PushZip(
 }
 
 type zipUploadHandler struct {
-	rootPath string
-	protocol *githttp.GitProtocol
-	metrics  base.Metrics
-	log      logging.Logger
-	tracing  tracing.Provider
+	rootPath        string
+	protocol        *githttp.GitProtocol
+	metrics         base.Metrics
+	log             logging.Logger
+	lockfileManager *githttp.LockfileManager
+	tracing         tracing.Provider
 }
 
 func (h *zipUploadHandler) handleGitUploadZip(
@@ -1553,7 +1554,7 @@ func (h *zipUploadHandler) handleGitUploadZip(
 	defer repo.Free()
 
 	acquireLockSegment := txn.StartSegment("acquire lock")
-	lockfile := githttp.NewLockfile(repo.Path())
+	lockfile := h.lockfileManager.NewLockfile(repo.Path())
 	if ok, err := lockfile.TryRLock(); !ok {
 		log.Info(
 			"Waiting for the lockfile",
@@ -1746,11 +1747,12 @@ func (h *zipUploadHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 // ZipHandlerOpts contains all the possible options to initialize the zip handler.
 type ZipHandlerOpts struct {
-	RootPath string
-	Protocol *githttp.GitProtocol
-	Metrics  base.Metrics
-	Log      logging.Logger
-	Tracing  tracing.Provider
+	RootPath        string
+	Protocol        *githttp.GitProtocol
+	Metrics         base.Metrics
+	Log             logging.Logger
+	LockfileManager *githttp.LockfileManager
+	Tracing         tracing.Provider
 }
 
 // NewZipHandler is the HTTP handler that allows uploading .zip files.
@@ -1762,10 +1764,11 @@ func NewZipHandler(opts ZipHandlerOpts) http.Handler {
 		opts.Tracing = tracing.NewNoOpProvider()
 	}
 	return &zipUploadHandler{
-		rootPath: opts.RootPath,
-		protocol: opts.Protocol,
-		metrics:  opts.Metrics,
-		log:      opts.Log,
-		tracing:  opts.Tracing,
+		rootPath:        opts.RootPath,
+		protocol:        opts.Protocol,
+		metrics:         opts.Metrics,
+		log:             opts.Log,
+		lockfileManager: opts.LockfileManager,
+		tracing:         opts.Tracing,
 	}
 }

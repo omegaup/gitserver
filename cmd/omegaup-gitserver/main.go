@@ -78,6 +78,7 @@ type muxGitHandler struct {
 
 func muxHandler(
 	app *newrelic.Application,
+	lockfileManager *githttp.LockfileManager,
 	port uint16,
 	rootPath string,
 	protocol *githttp.GitProtocol,
@@ -86,18 +87,20 @@ func muxHandler(
 	metrics, metricsHandler := gitserver.SetupMetrics(ProgramVersion)
 	tracing := nrtracing.New(app)
 	_, wrappedGitHandler := tracing.WrapHandle("/", gitserver.NewGitHandler(gitserver.GitHandlerOpts{
-		RootPath: rootPath,
-		Protocol: protocol,
-		Metrics:  metrics,
-		Log:      log,
-		Tracing:  tracing,
+		RootPath:        rootPath,
+		Protocol:        protocol,
+		Metrics:         metrics,
+		Log:             log,
+		LockfileManager: lockfileManager,
+		Tracing:         tracing,
 	}))
 	_, wrappedZipHandler := tracing.WrapHandle("/", gitserver.NewZipHandler(gitserver.ZipHandlerOpts{
-		RootPath: rootPath,
-		Protocol: protocol,
-		Metrics:  metrics,
-		Log:      log,
-		Tracing:  tracing,
+		RootPath:        rootPath,
+		Protocol:        protocol,
+		Metrics:         metrics,
+		Log:             log,
+		LockfileManager: lockfileManager,
+		Tracing:         tracing,
 	}))
 	_, wrappedHealthHandler := tracing.WrapHandle("/health", gitserver.HealthHandler(
 		rootPath,
@@ -186,6 +189,9 @@ func main() {
 		os.Exit(1)
 	}
 
+	lockfileManager := githttp.NewLockfileManager()
+	defer lockfileManager.Clear()
+
 	protocol := gitserver.NewGitProtocol(gitserver.GitProtocolOpts{
 		GitProtocolOpts: githttp.GitProtocolOpts{
 			AuthCallback:               authCallback,
@@ -198,6 +204,7 @@ func main() {
 			LibinteractiveJarPath: config.Gitserver.LibinteractivePath,
 			Log:                   log,
 		},
+		LockfileManager: lockfileManager,
 	})
 
 	var servers []*http.Server
@@ -208,6 +215,7 @@ func main() {
 		Handler: http.TimeoutHandler(
 			muxHandler(
 				app,
+				lockfileManager,
 				config.Gitserver.Port,
 				config.Gitserver.RootPath,
 				protocol,
