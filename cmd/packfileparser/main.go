@@ -7,7 +7,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/omegaup/go-base/logging/log15"
+	"github.com/omegaup/go-base/logging/log15/v3"
 	"github.com/omegaup/go-base/v3/logging"
 
 	git "github.com/libgit2/git2go/v33"
@@ -33,7 +33,7 @@ func processOnePackfile(
 	indexer, err := git.NewIndexer(".", odb, func(stats git.TransferProgress) error {
 		log.Debug(
 			"Progress",
-			map[string]interface{}{
+			map[string]any{
 				"stats": stats,
 			},
 		)
@@ -54,7 +54,7 @@ func processOnePackfile(
 	}
 	log.Info(
 		"Done!",
-		map[string]interface{}{
+		map[string]any{
 			"hash": hash,
 		},
 	)
@@ -132,7 +132,7 @@ func processObject(repository *git.Repository, oid *git.Oid, message string) err
 	}
 	log.Debug(
 		"Exists now",
-		map[string]interface{}{
+		map[string]any{
 			"oid":      oid,
 			"type":     obj.Type(),
 			"contents": contents,
@@ -202,7 +202,7 @@ func main() {
 	})
 	log.Info(
 		"Done",
-		map[string]interface{}{
+		map[string]any{
 			"before": beforeObjectsCount,
 			"after":  afterObjects,
 		},

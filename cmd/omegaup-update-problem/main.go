@@ -17,7 +17,7 @@ import (
 	"github.com/omegaup/githttp/v2"
 	"github.com/omegaup/gitserver"
 	"github.com/omegaup/gitserver/request"
-	"github.com/omegaup/go-base/logging/log15"
+	"github.com/omegaup/go-base/logging/log15/v3"
 	base "github.com/omegaup/go-base/v3"
 	"github.com/omegaup/go-base/v3/logging"
 	"github.com/omegaup/quark/common"
@@ -265,7 +265,7 @@ func commitBlobs(
 	if err != nil {
 		log.Error(
 			"Failed to get the repository's HEAD",
-			map[string]interface{}{
+			map[string]any{
 				"err": err,
 			},
 		)
@@ -331,7 +331,7 @@ func commitBlobs(
 	if err != nil {
 		log.Error(
 			"Failed to push blobs",
-			map[string]interface{}{
+			map[string]any{
 				"err": err,
 			},
 		)
@@ -340,7 +340,7 @@ func commitBlobs(
 	if unpackErr != nil {
 		log.Error(
 			"Failed to unpack packfile",
-			map[string]interface{}{
+			map[string]any{
 				"err": unpackErr,
 			},
 		)
@@ -351,7 +351,7 @@ func commitBlobs(
 	if err != nil {
 		log.Error(
 			"failed to get updated files",
-			map[string]interface{}{
+			map[string]any{
 				"err": err,
 			},
 		)
@@ -391,7 +391,7 @@ func main() {
 		if err != nil {
 			log.Error(
 				"Failed to create temporary directory",
-				map[string]interface{}{
+				map[string]any{
 					"err": err,
 				},
 			)
@@ -402,7 +402,7 @@ func main() {
 		if err := os.Chmod(dir, 0755); err != nil {
 			log.Error(
 				"Failed to chmod temporary directory",
-				map[string]interface{}{
+				map[string]any{
 					"err": err,
 				},
 			)
@@ -413,7 +413,7 @@ func main() {
 		if err != nil {
 			log.Error(
 				"Failed to init bare repository",
-				map[string]interface{}{
+				map[string]any{
 					"err": err,
 				},
 			)
@@ -437,7 +437,7 @@ func main() {
 		if err != nil {
 			log.Error(
 				"failed to open existing repository",
-				map[string]interface{}{
+				map[string]any{
 					"err": err,
 				},
 			)
@@ -450,14 +450,14 @@ func main() {
 	if ok, err := lockfile.TryLock(); !ok {
 		log.Info(
 			"Waiting for the lockfile",
-			map[string]interface{}{
+			map[string]any{
 				"err": err,
 			},
 		)
 		if err := lockfile.Lock(); err != nil {
 			log.Error(
 				"Failed to acquire the lockfile",
-				map[string]interface{}{
+				map[string]any{
 					"err": err,
 				},
 			)
@@ -472,7 +472,7 @@ func main() {
 		if err := json.Unmarshal([]byte(*problemSettingsJSON), problemSettings); err != nil {
 			log.Error(
 				"Failed to parse -problem-settings",
-				map[string]interface{}{
+				map[string]any{
 					"err": err,
 				},
 			)
@@ -486,7 +486,7 @@ func main() {
 		if err != nil {
 			log.Error(
 				"Invalid value for -merge-strategy",
-				map[string]interface{}{
+				map[string]any{
 					"strategy": *mergeStrategyName,
 				},
 			)
@@ -497,7 +497,7 @@ func main() {
 		if err != nil {
 			log.Error(
 				"Failed to open the zip file",
-				map[string]interface{}{
+				map[string]any{
 					"err": err,
 				},
 			)
@@ -520,7 +520,7 @@ func main() {
 		if err != nil {
 			log.Error(
 				"Failed update the repository",
-				map[string]interface{}{
+				map[string]any{
 					"path": *repositoryPath,
 					"err":  err,
 				},
@@ -532,7 +532,7 @@ func main() {
 		} else if err := commitCallback(); err != nil {
 			log.Error(
 				"Failed to commit the write to the repository",
-				map[string]interface{}{
+				map[string]any{
 					"err": err,
 				},
 			)
@@ -546,7 +546,7 @@ func main() {
 		if err := json.Unmarshal([]byte(*blobUpdateJSON), &blobUpdates); err != nil {
 			log.Error(
 				"Failed to parse -blob-update",
-				map[string]interface{}{
+				map[string]any{
 					"err": err,
 				},
 			)
@@ -559,7 +559,7 @@ func main() {
 			if err != nil {
 				log.Error(
 					"failed to open blob contents",
-					map[string]interface{}{
+					map[string]any{
 						"contents path": blobUpdate.ContentsPath,
 						"path":          blobUpdate.Path,
 					},
@@ -582,7 +582,7 @@ func main() {
 		if err != nil {
 			log.Error(
 				"Failed update the repository",
-				map[string]interface{}{
+				map[string]any{
 					"path": *repositoryPath,
 					"err":  err,
 				},
@@ -598,7 +598,7 @@ func main() {
 		if err != nil {
 			log.Error(
 				"Failed to open the empty zip file",
-				map[string]interface{}{
+				map[string]any{
 					"err": err,
 				},
 			)
@@ -620,7 +620,7 @@ func main() {
 		if err != nil {
 			log.Error(
 				"Failed update the repository",
-				map[string]interface{}{
+				map[string]any{
 					"path": *repositoryPath,
 					"err":  err,
 				},

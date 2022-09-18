@@ -1492,7 +1492,7 @@ func (p *gitProtocol) validateUpdate(
 
 	p.log.Info(
 		"Update",
-		map[string]interface{}{
+		map[string]any{
 			"command": command,
 			"request": requestContext.Request,
 		},
@@ -1500,7 +1500,7 @@ func (p *gitProtocol) validateUpdate(
 	if command.IsDelete() {
 		p.log.Error(
 			"deleting references is disallowed",
-			map[string]interface{}{
+			map[string]any{
 				"ref":     command.ReferenceName,
 				"request": requestContext.Request,
 			},
@@ -1514,7 +1514,7 @@ func (p *gitProtocol) validateUpdate(
 		!githttp.ValidateFastForward(repo, newCommit, command.Reference) {
 		p.log.Error(
 			"non-fast-forward is not allowed for this branch",
-			map[string]interface{}{
+			map[string]any{
 				"ref":     command.ReferenceName,
 				"request": requestContext.Request,
 			},
@@ -1533,7 +1533,7 @@ func (p *gitProtocol) validateUpdate(
 		!strings.HasPrefix(command.ReferenceName, "refs/changes/") {
 		p.log.Error(
 			"invalid reference",
-			map[string]interface{}{
+			map[string]any{
 				"ref":     command.ReferenceName,
 				"request": requestContext.Request,
 			},
@@ -1548,7 +1548,7 @@ func (p *gitProtocol) validateUpdate(
 		command.ReferenceName == "refs/heads/private" {
 		p.log.Error(
 			"read-only reference",
-			map[string]interface{}{
+			map[string]any{
 				"ref":     command.ReferenceName,
 				"request": requestContext.Request,
 			},
@@ -1560,7 +1560,7 @@ func (p *gitProtocol) validateUpdate(
 		if !requestContext.Request.CanEdit {
 			p.log.Error(
 				"cannot modify reference due to not having permissions",
-				map[string]interface{}{
+				map[string]any{
 					"ref":     command.ReferenceName,
 					"request": requestContext.Request,
 				},
@@ -1580,7 +1580,7 @@ func (p *gitProtocol) validateUpdate(
 		if !requestContext.Request.CanEdit {
 			p.log.Error(
 				"cannot modify reference due to not having permissions",
-				map[string]interface{}{
+				map[string]any{
 					"ref":     command.ReferenceName,
 					"request": requestContext.Request,
 				},
@@ -1592,7 +1592,7 @@ func (p *gitProtocol) validateUpdate(
 		if !requestContext.Request.IsAdmin {
 			p.log.Error(
 				"cannot modify reference due to being non-admin",
-				map[string]interface{}{
+				map[string]any{
 					"ref":     command.ReferenceName,
 					"request": requestContext.Request,
 				},
@@ -1604,7 +1604,7 @@ func (p *gitProtocol) validateUpdate(
 		if !requestContext.Request.CanEdit && !requestContext.Request.HasSolved {
 			p.log.Error(
 				"cannot modify reference due to not having permissions",
-				map[string]interface{}{
+				map[string]any{
 					"ref":     command.ReferenceName,
 					"request": requestContext.Request,
 				},
@@ -1617,7 +1617,7 @@ func (p *gitProtocol) validateUpdate(
 	if !requestContext.Request.CanEdit && !requestContext.Request.HasSolved {
 		p.log.Error(
 			"cannot modify reference due to not having permissions",
-			map[string]interface{}{
+			map[string]any{
 				"ref":     command.ReferenceName,
 				"request": requestContext.Request,
 			},
@@ -1718,7 +1718,7 @@ func (p *gitProtocol) preprocessMaster(
 	}
 	p.log.Info(
 		"Updating ref",
-		map[string]interface{}{
+		map[string]any{
 			"ref":          masterRef,
 			"err":          err,
 			"masterCommit": masterCommit,
@@ -1771,7 +1771,7 @@ func (p *gitProtocol) preprocess(
 	defer tracing.FromContext(ctx).StartSegment("preprocess").End()
 	p.log.Info(
 		"Updating",
-		map[string]interface{}{
+		map[string]any{
 			"reference": originalCommands,
 		},
 	)

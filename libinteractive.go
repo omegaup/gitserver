@@ -66,7 +66,7 @@ func (c *LibinteractiveCompiler) GetInteractiveSettings(
 		if _, err := io.Copy(stdin, contents); err != nil {
 			c.Log.Error(
 				"Failed to write to libinteractive",
-				map[string]interface{}{
+				map[string]any{
 					"cmd": cmd,
 					"err": err,
 				},
@@ -89,7 +89,7 @@ func (c *LibinteractiveCompiler) GetInteractiveSettings(
 		if err := json.NewDecoder(stdout).Decode(&settings); err != nil {
 			c.Log.Error(
 				"Failed to read from libinteractive",
-				map[string]interface{}{
+				map[string]any{
 					"cmd": cmd,
 					"err": err,
 				},
@@ -114,7 +114,7 @@ func (c *LibinteractiveCompiler) GetInteractiveSettings(
 		if _, err := io.Copy(&buffer, stderr); err != nil {
 			c.Log.Error(
 				"Failed to copy libinteractive stderr",
-				map[string]interface{}{
+				map[string]any{
 					"cmd": cmd,
 					"err": err,
 				},
@@ -128,7 +128,7 @@ func (c *LibinteractiveCompiler) GetInteractiveSettings(
 		stderrError := errors.New((<-stderrChan).String())
 		c.Log.Error(
 			"Failed to run command",
-			map[string]interface{}{
+			map[string]any{
 				"cmd":    cmd,
 				"err":    err,
 				"stderr": stderrError,

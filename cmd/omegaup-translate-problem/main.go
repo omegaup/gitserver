@@ -15,7 +15,7 @@ import (
 	"github.com/omegaup/githttp/v2"
 	"github.com/omegaup/gitserver"
 	"github.com/omegaup/gitserver/request"
-	"github.com/omegaup/go-base/logging/log15"
+	"github.com/omegaup/go-base/logging/log15/v3"
 	base "github.com/omegaup/go-base/v3"
 	"github.com/omegaup/go-base/v3/logging"
 
@@ -268,7 +268,7 @@ func mergeRepository(sourceRepositoryPath, destRepositoryPath string, log loggin
 
 			log.Info(
 				"commit",
-				map[string]interface{}{
+				map[string]any{
 					"id":      commit.Id().String(),
 					"parents": commit.ParentCount(),
 				},
@@ -638,7 +638,7 @@ func main() {
 		if err := mergeRepository(sourceRepositoryPath, destRepositoryPath, log); err != nil {
 			log.Error(
 				"failed to merge repository",
-				map[string]interface{}{
+				map[string]any{
 					"err": err,
 				},
 			)
@@ -654,7 +654,7 @@ func main() {
 		if err != nil {
 			log.Error(
 				"failed to create report JSON file",
-				map[string]interface{}{
+				map[string]any{
 					"path": *reportPath,
 					"err":  err,
 				},
@@ -667,7 +667,7 @@ func main() {
 		if err != nil {
 			log.Error(
 				"failed to unmerge repository",
-				map[string]interface{}{
+				map[string]any{
 					"err": err,
 				},
 			)
@@ -679,7 +679,7 @@ func main() {
 		if err := encoder.Encode(report); err != nil {
 			log.Error(
 				"failed to marshal report",
-				map[string]interface{}{
+				map[string]any{
 					"path": *reportPath,
 					"err":  err,
 				},
@@ -689,7 +689,7 @@ func main() {
 	} else {
 		log.Error(
 			"unrecognized operation",
-			map[string]interface{}{
+			map[string]any{
 				"operation": operation,
 			},
 		)

@@ -98,7 +98,7 @@ func (a *omegaupAuthorization) parseBearerToken(token string) (username, problem
 	if err := paseto.NewV2().Verify(token, a.publicKey, &jsonToken, &footer); err != nil {
 		a.log.Error(
 			"failed to verify token",
-			map[string]interface{}{
+			map[string]any{
 				"err": err,
 			},
 		)
@@ -108,7 +108,7 @@ func (a *omegaupAuthorization) parseBearerToken(token string) (username, problem
 	if err := jsonToken.Validate(paseto.IssuedBy("omegaUp frontend"), paseto.ValidAt(time.Now())); err != nil {
 		a.log.Error(
 			"failed to validate token",
-			map[string]interface{}{
+			map[string]any{
 				"err": err,
 			},
 		)
@@ -146,7 +146,7 @@ func (a *omegaupAuthorization) parseUsernameAndPassword(
 		// omegaup:system and friends can only log in using the auth token or the secret token.
 		a.log.Error(
 			"user tried to login with restricted user",
-			map[string]interface{}{
+			map[string]any{
 				"username": username,
 			},
 		)
@@ -170,7 +170,7 @@ func (a *omegaupAuthorization) parseUsernameAndPassword(
 	if err != nil {
 		a.log.Error(
 			"failed to query user",
-			map[string]interface{}{
+			map[string]any{
 				"username": username,
 				"err":      err,
 			},
@@ -181,7 +181,7 @@ func (a *omegaupAuthorization) parseUsernameAndPassword(
 	if !gitToken.Valid {
 		a.log.Error(
 			"user is missing a git token",
-			map[string]interface{}{
+			map[string]any{
 				"username": username,
 			},
 		)
@@ -192,7 +192,7 @@ func (a *omegaupAuthorization) parseUsernameAndPassword(
 	if err != nil {
 		a.log.Error(
 			"failed to verify user's git token",
-			map[string]interface{}{
+			map[string]any{
 				"username": username,
 				"err":      err,
 			},
@@ -206,7 +206,7 @@ func (a *omegaupAuthorization) parseUsernameAndPassword(
 	} else {
 		a.log.Error(
 			"user provided the wrong git token",
-			map[string]interface{}{
+			map[string]any{
 				"username": username,
 			},
 		)
@@ -334,7 +334,7 @@ func (a *omegaupAuthorization) authorize(
 		ok = false
 		a.log.Error(
 			"Mismatched Basic authentication username",
-			map[string]interface{}{
+			map[string]any{
 				"username":            username,
 				"basic auth username": basicAuthUsername,
 				"repository":          repositoryName,
@@ -362,7 +362,7 @@ func (a *omegaupAuthorization) authorize(
 		w.WriteHeader(http.StatusUnauthorized)
 		a.log.Error(
 			"Missing authentication",
-			map[string]interface{}{
+			map[string]any{
 				"username":   username,
 				"repository": repositoryName,
 			},
@@ -374,7 +374,7 @@ func (a *omegaupAuthorization) authorize(
 		w.WriteHeader(http.StatusForbidden)
 		a.log.Error(
 			"Mismatched problem name",
-			map[string]interface{}{
+			map[string]any{
 				"username":   username,
 				"repository": repositoryName,
 				"problem":    problem,
@@ -417,7 +417,7 @@ func (a *omegaupAuthorization) authorize(
 		if err != nil {
 			a.log.Error(
 				"Auth",
-				map[string]interface{}{
+				map[string]any{
 					"username":   username,
 					"repository": repositoryName,
 					"operation":  operation,
@@ -434,7 +434,7 @@ func (a *omegaupAuthorization) authorize(
 	}
 	a.log.Info(
 		"Auth",
-		map[string]interface{}{
+		map[string]any{
 			"username":   username,
 			"repository": repositoryName,
 			"operation":  operation,

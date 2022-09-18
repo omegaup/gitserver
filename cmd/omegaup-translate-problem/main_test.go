@@ -8,7 +8,7 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/omegaup/go-base/logging/log15"
+	"github.com/omegaup/go-base/logging/log15/v3"
 )
 
 func TestRoundtrip(t *testing.T) {
