@@ -30,6 +30,8 @@ func TestHealth(t *testing.T) {
 	if os.Getenv("PRESERVE") == "" {
 		defer os.RemoveAll(tmpDir)
 	}
+	m := githttp.NewLockfileManager()
+	defer m.Clear()
 
 	log, err := log15.New("info", false)
 	if err != nil {
@@ -47,6 +49,7 @@ func TestHealth(t *testing.T) {
 	ts := httptest.NewUnstartedServer(nil)
 	ts.Config.Handler = muxHandler(
 		nil,
+		m,
 		uint16(ts.Listener.Addr().(*net.TCPAddr).Port),
 		tmpDir,
 		gitserver.NewGitProtocol(gitserver.GitProtocolOpts{
@@ -57,6 +60,7 @@ func TestHealth(t *testing.T) {
 			AllowDirectPushToMaster:     config.Gitserver.AllowDirectPushToMaster,
 			HardOverallWallTimeLimit:    gitserver.OverallWallTimeHardLimit,
 			InteractiveSettingsCompiler: fakeInteractiveSettingsCompiler,
+			LockfileManager:             m,
 		}),
 		log,
 	)

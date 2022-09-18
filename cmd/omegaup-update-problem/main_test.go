@@ -31,6 +31,8 @@ func getTreeOid(t *testing.T, extraFileContents map[string]io.Reader, log loggin
 	if os.Getenv("PRESERVE") == "" {
 		defer os.RemoveAll(tmpdir)
 	}
+	m := githttp.NewLockfileManager()
+	defer m.Clear()
 
 	fileContents := map[string]io.Reader{
 		"cases/0.in":             strings.NewReader("1 2"),
@@ -54,13 +56,14 @@ func getTreeOid(t *testing.T, extraFileContents map[string]io.Reader, log loggin
 		t.Fatalf("Failed to initialize bare repository: %v", err)
 	}
 
-	lockfile := githttp.NewLockfile(repo.Path())
+	lockfile := m.NewLockfile(repo.Path())
 	if err := lockfile.RLock(); err != nil {
 		t.Fatalf("Failed to acquire the lockfile: %v", err)
 	}
 	defer lockfile.Unlock()
 
 	if _, err := commitZipFile(
+		m,
 		common.NewProblemFilesFromZip(zipReader, ":memory:"),
 		repo,
 		lockfile,
@@ -217,6 +220,8 @@ func TestProblemUpdateZip(t *testing.T) {
 	if os.Getenv("PRESERVE") == "" {
 		defer os.RemoveAll(tmpdir)
 	}
+	m := githttp.NewLockfileManager()
+	defer m.Clear()
 	ctx := context.Background()
 
 	repo, err := gitserver.InitRepository(ctx, tmpdir)
@@ -224,7 +229,7 @@ func TestProblemUpdateZip(t *testing.T) {
 		t.Fatalf("Failed to initialize bare repository: %v", err)
 	}
 
-	lockfile := githttp.NewLockfile(repo.Path())
+	lockfile := m.NewLockfile(repo.Path())
 	if err := lockfile.RLock(); err != nil {
 		t.Fatalf("Failed to acquire the lockfile: %v", err)
 	}
@@ -247,6 +252,7 @@ func TestProblemUpdateZip(t *testing.T) {
 		}
 
 		updateResult, err := commitZipFile(
+			m,
 			common.NewProblemFilesFromZip(zipReader, ":memory:"),
 			repo,
 			lockfile,
@@ -303,6 +309,7 @@ func TestProblemUpdateZip(t *testing.T) {
 		}
 
 		updateResult, err := commitZipFile(
+			m,
 			common.NewProblemFilesFromZip(zipReader, ":memory:"),
 			repo,
 			lockfile,
@@ -354,6 +361,8 @@ func TestProblemUpdateBlobs(t *testing.T) {
 	if os.Getenv("PRESERVE") == "" {
 		defer os.RemoveAll(tmpdir)
 	}
+	m := githttp.NewLockfileManager()
+	defer m.Clear()
 	ctx := context.Background()
 
 	repo, err := gitserver.InitRepository(ctx, tmpdir)
@@ -361,7 +370,7 @@ func TestProblemUpdateBlobs(t *testing.T) {
 		t.Fatalf("Failed to initialize bare repository: %v", err)
 	}
 
-	lockfile := githttp.NewLockfile(repo.Path())
+	lockfile := m.NewLockfile(repo.Path())
 	if err := lockfile.RLock(); err != nil {
 		t.Fatalf("Failed to acquire the lockfile: %v", err)
 	}
@@ -384,6 +393,7 @@ func TestProblemUpdateBlobs(t *testing.T) {
 		}
 
 		updateResult, err := commitZipFile(
+			m,
 			common.NewProblemFilesFromZip(zipReader, ":memory:"),
 			repo,
 			lockfile,
@@ -427,6 +437,7 @@ func TestProblemUpdateBlobs(t *testing.T) {
 	{
 		// Typo has been corrected.
 		if _, err = commitBlobs(
+			m,
 			repo,
 			lockfile,
 			"test",

@@ -209,6 +209,7 @@ type gitProtocol struct {
 	hardOverallWallTimeLimit    base.Duration
 	interactiveSettingsCompiler InteractiveSettingsCompiler
 	log                         logging.Logger
+	lockfileManager             *githttp.LockfileManager
 }
 
 // GitProtocolOpts contains all the possible options to initialize the git protocol.
@@ -218,6 +219,7 @@ type GitProtocolOpts struct {
 	AllowDirectPushToMaster     bool
 	HardOverallWallTimeLimit    base.Duration
 	InteractiveSettingsCompiler InteractiveSettingsCompiler
+	LockfileManager             *githttp.LockfileManager
 }
 
 // NewGitProtocol creates a new GitProtocol with the provided authorization
@@ -228,6 +230,7 @@ func NewGitProtocol(opts GitProtocolOpts) *githttp.GitProtocol {
 		hardOverallWallTimeLimit:    opts.HardOverallWallTimeLimit,
 		interactiveSettingsCompiler: opts.InteractiveSettingsCompiler,
 		log:                         opts.Log,
+		lockfileManager:             opts.LockfileManager,
 	}
 	opts.AllowNonFastForward = true
 	opts.UpdateCallback = protocol.validateUpdate
@@ -1736,6 +1739,7 @@ func (p *gitProtocol) preprocessMaster(
 	spliceCommitSegment := txn.StartSegment("SpliceCommit")
 	newCommands, err := githttp.SpliceCommit(
 		originalRepo,
+		p.lockfileManager,
 		originalCommit,
 		masterCommit,
 		requestContext.UpdatedFiles,
@@ -1783,11 +1787,12 @@ func (p *gitProtocol) preprocess(
 
 // GitHandlerOpts contains all the possible options to initialize the git Server.
 type GitHandlerOpts struct {
-	RootPath string
-	Protocol *githttp.GitProtocol
-	Metrics  base.Metrics
-	Log      logging.Logger
-	Tracing  tracing.Provider
+	RootPath        string
+	Protocol        *githttp.GitProtocol
+	Metrics         base.Metrics
+	Log             logging.Logger
+	LockfileManager *githttp.LockfileManager
+	Tracing         tracing.Provider
 }
 
 // NewGitHandler is the HTTP handler for the omegaUp git server.
@@ -1803,8 +1808,9 @@ func NewGitHandler(opts GitHandlerOpts) http.Handler {
 		ContextCallback: func(ctx context.Context) context.Context {
 			return request.NewContext(ctx, opts.Metrics)
 		},
-		Log:     opts.Log,
-		Tracing: opts.Tracing,
+		Log:             opts.Log,
+		LockfileManager: opts.LockfileManager,
+		Tracing:         opts.Tracing,
 	})
 }
 

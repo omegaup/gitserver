@@ -140,7 +140,10 @@ func createPackfileFromSplitCommit(
 		return errors.Wrapf(err, "failed to write packfile into the packbuilder")
 	}
 
-	lockfile := githttp.NewLockfile(destRepo.Path())
+	lockfileManager := githttp.NewLockfileManager()
+	defer lockfileManager.Clear()
+
+	lockfile := lockfileManager.NewLockfile(destRepo.Path())
 	defer lockfile.Unlock()
 
 	protocol := githttp.NewGitProtocol(githttp.GitProtocolOpts{
@@ -378,7 +381,10 @@ func createPackfileFromMergedCommit(
 		return nil, errors.Wrapf(err, "failed to write packfile into the packbuilder")
 	}
 
-	lockfile := githttp.NewLockfile(destRepo.Path())
+	lockfileManager := githttp.NewLockfileManager()
+	defer lockfileManager.Clear()
+
+	lockfile := lockfileManager.NewLockfile(destRepo.Path())
 	defer lockfile.Unlock()
 
 	overallWallTimeHardLimit := gitserver.OverallWallTimeHardLimit
@@ -390,6 +396,7 @@ func createPackfileFromMergedCommit(
 		GitProtocolOpts: githttp.GitProtocolOpts{
 			Log: log,
 		},
+		LockfileManager:          lockfileManager,
 		AllowDirectPushToMaster:  true,
 		HardOverallWallTimeLimit: overallWallTimeHardLimit,
 		InteractiveSettingsCompiler: &gitserver.LibinteractiveCompiler{
