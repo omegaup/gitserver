@@ -9,11 +9,11 @@ require (
 	github.com/mattn/go-sqlite3 v1.14.8
 	github.com/newrelic/go-agent/v3 v3.15.2
 	github.com/o1egl/paseto v1.0.0
-	github.com/omegaup/githttp/v2 v2.4.10
-	github.com/omegaup/go-base/logging/log15/v3 v3.3.4
-	github.com/omegaup/go-base/tracing/newrelic/v3 v3.3.4
-	github.com/omegaup/go-base/v3 v3.3.4
-	github.com/omegaup/quark v1.9.31
+	github.com/omegaup/githttp/v2 v2.4.11
+	github.com/omegaup/go-base/logging/log15/v3 v3.3.6
+	github.com/omegaup/go-base/tracing/newrelic/v3 v3.3.6
+	github.com/omegaup/go-base/v3 v3.3.6
+	github.com/omegaup/quark v1.9.32
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus/client_golang v1.8.0
 	github.com/saintfish/chardet v0.0.0-20120816061221-3af4cd4741ca
