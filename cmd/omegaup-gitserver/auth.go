@@ -391,7 +391,7 @@ func (a *omegaupAuthorization) authorize(
 		requestContext.Request.CanView = true
 		requestContext.Request.CanEdit = true
 		requestContext.Request.CanViewAllRefs = true
-	} else if username == "omegaup:grader" || *insecureSkipAuthorization {
+	} else if username == "omegaup:grader" {
 		// This is the grader, it has read-only privileges for all problems.
 		requestContext.Request.CanView = true
 		requestContext.Request.CanViewAllRefs = true
