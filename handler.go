@@ -1739,7 +1739,6 @@ func (p *gitProtocol) preprocessMaster(
 	spliceCommitSegment := txn.StartSegment("SpliceCommit")
 	newCommands, err := githttp.SpliceCommit(
 		originalRepo,
-		p.lockfileManager,
 		originalCommit,
 		masterCommit,
 		requestContext.UpdatedFiles,
