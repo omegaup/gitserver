@@ -4,10 +4,12 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"net"
 	"net/http"
 	"net/http/pprof"
 	"os"
 	"os/signal"
+	"path"
 	"strings"
 	"sync"
 	"syscall"
@@ -21,6 +23,9 @@ import (
 	"github.com/omegaup/go-base/v3/logging"
 	"github.com/omegaup/go-base/v3/tracing"
 
+	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/aws/session"
+	"github.com/aws/aws-sdk-go/service/s3"
 	"github.com/coreos/go-systemd/v22/daemon"
 	git "github.com/libgit2/git2go/v33"
 	newrelic "github.com/newrelic/go-agent/v3/newrelic"
@@ -66,6 +71,79 @@ func referenceDiscovery(
 		}
 	}
 	return false
+}
+
+type postUpdateCallback struct {
+	s3c *s3.S3
+	log logging.Logger
+}
+
+func newPostUpdateCallback(s3c *s3.S3, log logging.Logger) githttp.PostUpdateCallback {
+	callback := &postUpdateCallback{
+		s3c: s3c,
+		log: log,
+	}
+	return callback.callback
+}
+
+func (c *postUpdateCallback) callback(
+	ctx context.Context,
+	repo *git.Repository,
+	updatedFiles []string,
+) error {
+	for _, updatedFile := range updatedFiles {
+		if !strings.HasPrefix(updatedFile, "refs/heads/") &&
+			!strings.HasPrefix(updatedFile, "objects/pack/pack-") &&
+			updatedFile != "HEAD" {
+			continue
+		}
+
+		localPath := path.Join(repo.Path(), updatedFile)
+		problemName := path.Base(repo.Path())
+
+		f, err := os.Open(localPath)
+		if err != nil {
+			c.log.Error(
+				"Failed to open file",
+				map[string]any{
+					"path": localPath,
+					"err":  err,
+				},
+			)
+			continue
+		}
+		s, err := f.Stat()
+		if err != nil {
+			c.log.Error(
+				"Failed to stat file",
+				map[string]any{
+					"path": localPath,
+					"err":  err,
+				},
+			)
+			f.Close()
+			continue
+		}
+
+		input := &s3.PutObjectInput{
+			Bucket:        aws.String("omegaup-problems"),
+			Key:           aws.String(path.Join(problemName, updatedFile)),
+			Body:          f,
+			ContentLength: aws.Int64(s.Size()),
+		}
+		_, err = c.s3c.PutObjectWithContext(aws.Context(context.Background()), input)
+		f.Close()
+		if err != nil {
+			c.log.Error(
+				"Failed to put file",
+				map[string]any{
+					"path": localPath,
+					"err":  err,
+				},
+			)
+		}
+	}
+	return nil
 }
 
 type muxGitHandler struct {
@@ -192,10 +270,36 @@ func main() {
 	lockfileManager := githttp.NewLockfileManager()
 	defer lockfileManager.Clear()
 
+	sess, err := session.NewSession(
+		aws.NewConfig().
+			WithHTTPClient(&http.Client{
+				Timeout: 5 * time.Minute,
+				Transport: &http.Transport{
+					Dial: (&net.Dialer{
+						Timeout:   30 * time.Second,
+						KeepAlive: 30 * time.Second,
+					}).Dial,
+					TLSHandshakeTimeout:   10 * time.Second,
+					ResponseHeaderTimeout: 10 * time.Second,
+					ExpectContinueTimeout: 1 * time.Second,
+				},
+			}).
+			WithLogLevel(aws.LogOff).
+			WithLogger(aws.LoggerFunc(func(args ...any) {
+				log.Debug(fmt.Sprintln(args...), nil)
+			})),
+	)
+	if err != nil {
+		log.Error("aws session", map[string]any{"error": err})
+		os.Exit(1)
+	}
+	s3c := s3.New(sess)
+
 	protocol := gitserver.NewGitProtocol(gitserver.GitProtocolOpts{
 		GitProtocolOpts: githttp.GitProtocolOpts{
 			AuthCallback:               authCallback,
 			ReferenceDiscoveryCallback: referenceDiscovery,
+			PostUpdateCallback:         newPostUpdateCallback(s3c, log),
 			Log:                        log,
 		},
 		AllowDirectPushToMaster:  config.Gitserver.AllowDirectPushToMaster,
