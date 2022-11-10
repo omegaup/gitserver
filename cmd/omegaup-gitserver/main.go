@@ -91,6 +91,11 @@ func (c *postUpdateCallback) callback(
 	repo *git.Repository,
 	updatedFiles []string,
 ) error {
+	if strings.Contains(repo.Path(), "temp.") {
+		// This is a pre-committed repository. We'll upload it when
+		// we commit it.
+		return nil
+	}
 	for _, updatedFile := range updatedFiles {
 		if !strings.HasPrefix(updatedFile, "refs/heads/") &&
 			!strings.HasPrefix(updatedFile, "objects/pack/pack-") &&
