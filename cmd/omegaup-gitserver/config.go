@@ -62,6 +62,9 @@ type GitserverConfig struct {
 	// FrontendAuthorizationProblemRequestURL is the URL of the frontend API
 	// request to get user's privileges for a problem.
 	FrontendAuthorizationProblemRequestURL string
+
+	// UseS3 determines whether gitserver will push to / pull from S3.
+	UseS3 bool
 }
 
 // Config represents the configuration for the whole program.
@@ -94,6 +97,7 @@ var defaultConfig = Config{
 		LibinteractivePath:                     "/usr/share/java/libinteractive.jar",
 		AllowDirectPushToMaster:                false,
 		FrontendAuthorizationProblemRequestURL: "https://omegaup.com/api/authorization/problem/",
+		UseS3:                                  false,
 	},
 }
 

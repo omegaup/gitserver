@@ -270,36 +270,40 @@ func main() {
 	lockfileManager := githttp.NewLockfileManager()
 	defer lockfileManager.Clear()
 
-	sess, err := session.NewSession(
-		aws.NewConfig().
-			WithHTTPClient(&http.Client{
-				Timeout: 5 * time.Minute,
-				Transport: &http.Transport{
-					Dial: (&net.Dialer{
-						Timeout:   30 * time.Second,
-						KeepAlive: 30 * time.Second,
-					}).Dial,
-					TLSHandshakeTimeout:   10 * time.Second,
-					ResponseHeaderTimeout: 10 * time.Second,
-					ExpectContinueTimeout: 1 * time.Second,
-				},
-			}).
-			WithLogLevel(aws.LogOff).
-			WithLogger(aws.LoggerFunc(func(args ...any) {
-				log.Debug(fmt.Sprintln(args...), nil)
-			})),
-	)
-	if err != nil {
-		log.Error("aws session", map[string]any{"error": err})
-		os.Exit(1)
+	var postUpdateCallback githttp.PostUpdateCallback
+	if config.Gitserver.UseS3 {
+		sess, err := session.NewSession(
+			aws.NewConfig().
+				WithHTTPClient(&http.Client{
+					Timeout: 5 * time.Minute,
+					Transport: &http.Transport{
+						Dial: (&net.Dialer{
+							Timeout:   30 * time.Second,
+							KeepAlive: 30 * time.Second,
+						}).Dial,
+						TLSHandshakeTimeout:   10 * time.Second,
+						ResponseHeaderTimeout: 10 * time.Second,
+						ExpectContinueTimeout: 1 * time.Second,
+					},
+				}).
+				WithLogLevel(aws.LogOff).
+				WithLogger(aws.LoggerFunc(func(args ...any) {
+					log.Debug(fmt.Sprintln(args...), nil)
+				})),
+		)
+		if err != nil {
+			log.Error("aws session", map[string]any{"error": err})
+			os.Exit(1)
+		}
+		s3c := s3.New(sess)
+		postUpdateCallback = newPostUpdateCallback(s3c, log)
 	}
-	s3c := s3.New(sess)
 
 	protocol := gitserver.NewGitProtocol(gitserver.GitProtocolOpts{
 		GitProtocolOpts: githttp.GitProtocolOpts{
 			AuthCallback:               authCallback,
 			ReferenceDiscoveryCallback: referenceDiscovery,
-			PostUpdateCallback:         newPostUpdateCallback(s3c, log),
+			PostUpdateCallback:         postUpdateCallback,
 			Log:                        log,
 		},
 		AllowDirectPushToMaster:  config.Gitserver.AllowDirectPushToMaster,
