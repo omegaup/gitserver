@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"io/fs"
 	"io/ioutil"
 	"math/big"
 	"mime/multipart"
@@ -1679,11 +1680,30 @@ func (h *zipUploadHandler) handleRenameRepository(
 		return
 	}
 
+	// Nobody is going to update the files pre-rename, so to avoid
+	// acquiring a lock, we get the list of files in the problem
+	// pre-rename.
+	updatedFiles, err := listFilesRecursively(repositoryPath)
+	if err != nil {
+		log.Error(
+			"failed to get list of updated files",
+			map[string]any{
+				"err":         err,
+				"path":        repositoryPath,
+				"target path": targetRepositoryPath,
+			},
+		)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
 	if err := os.Rename(repositoryPath, targetRepositoryPath); err != nil {
 		log.Error(
 			"failed to rename repository",
 			map[string]any{
-				"err": err,
+				"err":         err,
+				"path":        repositoryPath,
+				"target path": targetRepositoryPath,
 			},
 		)
 		if os.IsNotExist(err) {
@@ -1695,6 +1715,20 @@ func (h *zipUploadHandler) handleRenameRepository(
 			w.WriteHeader(http.StatusInternalServerError)
 		}
 		return
+	}
+
+	repo, err := git.OpenRepository(targetRepositoryPath)
+	if err != nil {
+		log.Error(
+			"failed to open repository post-rename",
+			map[string]any{
+				"path":        repositoryPath,
+				"target path": targetRepositoryPath,
+			},
+		)
+	} else {
+		defer repo.Free()
+		h.protocol.PostUpdateCallback(r.Context(), repo, updatedFiles)
 	}
 
 	log.Info(
@@ -1743,6 +1777,26 @@ func (h *zipUploadHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		},
 	)
 	w.WriteHeader(http.StatusNotFound)
+}
+
+func listFilesRecursively(dir string) ([]string, error) {
+	var result []string
+	prefix := strings.TrimSuffix(dir, "/") + "/"
+	err := filepath.WalkDir(dir, func(p string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if !d.Type().IsRegular() {
+			return nil
+		}
+		relpath := strings.TrimPrefix(p, prefix)
+		result = append(result, relpath)
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	return result, nil
 }
 
 // ZipHandlerOpts contains all the possible options to initialize the zip handler.
