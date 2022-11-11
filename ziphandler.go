@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"io"
 	"io/fs"
-	"io/ioutil"
 	"math/big"
 	"mime/multipart"
 	"net/http"
@@ -384,7 +383,7 @@ func CreatePackfile(
 	}
 	defer odb.Free()
 
-	looseObjectsDir, err := ioutil.TempDir("", fmt.Sprintf("loose_objects_%s", path.Base(repo.Path())))
+	looseObjectsDir, err := os.MkdirTemp("", fmt.Sprintf("loose_objects_%s", path.Base(repo.Path())))
 	if err != nil {
 		return nil, errors.Wrap(
 			err,
@@ -538,7 +537,7 @@ func CreatePackfile(
 		}
 
 		if !strings.Contains(filename, "/") {
-			blobContents, err := ioutil.ReadAll(r)
+			blobContents, err := io.ReadAll(r)
 			if err != nil {
 				return nil, base.ErrorWithCategory(
 					ErrInternalGit,
@@ -1185,7 +1184,7 @@ func PushZip(
 		When:  time.Now(),
 	}
 
-	packfile, err := ioutil.TempFile("", "gitserver-packfile")
+	packfile, err := os.CreateTemp("", "gitserver-packfile")
 	if err != nil {
 		return nil, err
 	}
@@ -1447,7 +1446,7 @@ func (h *zipUploadHandler) handleGitUploadZip(
 		return
 	}
 
-	tempfile, err := ioutil.TempFile("", "gitserver-zip")
+	tempfile, err := os.CreateTemp("", "gitserver-zip")
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		return
@@ -1496,7 +1495,7 @@ func (h *zipUploadHandler) handleGitUploadZip(
 	openRepoSegment := txn.StartSegment("open repository")
 	commitCallback := func() error { return nil }
 	if requestContext.Request.Create {
-		dir, err := ioutil.TempDir(filepath.Dir(repositoryPath), "repository")
+		dir, err := os.MkdirTemp(filepath.Dir(repositoryPath), "temp.repository.")
 		if err != nil {
 			log.Error(
 				"Failed to create temporary directory",
