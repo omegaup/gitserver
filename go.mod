@@ -3,6 +3,7 @@ module github.com/omegaup/gitserver
 go 1.18
 
 require (
+	github.com/aws/aws-sdk-go v1.44.134
 	github.com/coreos/go-systemd/v22 v22.1.0
 	github.com/go-sql-driver/mysql v1.5.0
 	github.com/libgit2/git2go/v33 v33.0.4
@@ -17,7 +18,7 @@ require (
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus/client_golang v1.8.0
 	github.com/saintfish/chardet v0.0.0-20120816061221-3af4cd4741ca
-	golang.org/x/crypto v0.0.0-20210921155107-089bfa567519
+	golang.org/x/crypto v0.1.0
 	golang.org/x/text v0.4.0
 )
 
@@ -25,7 +26,6 @@ require (
 	github.com/aead/chacha20 v0.0.0-20180709150244-8b13a72661da // indirect
 	github.com/aead/chacha20poly1305 v0.0.0-20201124145622-1a5aba2a8b29 // indirect
 	github.com/aead/poly1305 v0.0.0-20180717145839-3fee0db0b635 // indirect
-	github.com/aws/aws-sdk-go v1.44.134 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/cespare/xxhash/v2 v2.1.1 // indirect
 	github.com/go-logfmt/logfmt v0.5.1 // indirect
